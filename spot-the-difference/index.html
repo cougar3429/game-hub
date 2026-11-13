@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spot the Difference</title>
+<style>
+  html,body{margin:0;height:100%;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif}
+  body{display:flex;align-items:center;justify-content:center}
+  .screen{display:none;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:16px}
+  .screen.on{display:flex}
+  .pair{display:flex;gap:10px;justify-content:center}
+  .eye{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#fff}
+  canvas{width:min(44vw,220px);height:min(44vw,220px);border-radius:4px}
+  button{font-size:18px;padding:12px 28px;border-radius:8px;border:1px solid #666;background:#222;color:#eee}
+  .big{font-size:28px}
+  .msg{font-size:15px;color:#aaa;max-width:320px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div id="start" class="screen on">
+  <div class="msg">Say how many differences you see in each pair (0 to 5).</div>
+  <button id="startBtn">Start</button>
+  <div id="err" class="msg"></div>
+</div>
+
+<div id="play" class="screen">
+  <div class="pair">
+    <div class="eye"><div class="dot"></div><canvas id="L"></canvas></div>
+    <div class="eye"><div class="dot"></div><canvas id="R"></canvas></div>
+  </div>
+</div>
+
+<div id="done" class="screen">
+  <div id="score" class="big"></div>
+  <div id="time" class="big"></div>
+</div>
+
+<script>
+const PAIRS = 10, MAXD = 5, S = 340;
+const C = ["#E24B4A","#378ADD","#639922","#EF9F27","#7F77DD","#D4537E","#1D9E75","#444441"];
+const T = ["circle","square","tri","star","ring"];
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+function gen(){
+  const s=[]; let tries=0;
+  while(s.length<16 && tries<500){ tries++;
+    const r=rnd(14,30), x=rnd(r+6,S-r-6), y=rnd(r+6,S-r-6);
+    if(s.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+8)) s.push({x,y,r,c:pick(C),t:pick(T),a:rnd(0,6.28)});
+  }
+  return s;
+}
+function shape(g,o){
+  g.fillStyle=o.c; g.strokeStyle=o.c; g.lineWidth=6;
+  g.save(); g.translate(o.x,o.y); g.rotate(o.a); g.beginPath();
+  const r=o.r;
+  if(o.t==="circle"){ g.arc(0,0,r,0,7); g.fill(); }
+  else if(o.t==="ring"){ g.arc(0,0,r-3,0,7); g.stroke(); }
+  else if(o.t==="square"){ g.fillRect(-r*.85,-r*.85,r*1.7,r*1.7); }
+  else if(o.t==="tri"){ g.moveTo(0,-r); g.lineTo(r*.95,r*.75); g.lineTo(-r*.95,r*.75); g.closePath(); g.fill(); }
+  else { for(let i=0;i<10;i++){ const rr=i%2?r*.45:r, an=i*Math.PI/5-Math.PI/2; g.lineTo(Math.cos(an)*rr,Math.sin(an)*rr); } g.closePath(); g.fill(); }
+  g.restore();
+}
+function draw(id,s){
+  const cv=document.getElementById(id), dpr=window.devicePixelRatio||1, w=cv.clientWidth;
+  cv.width=w*dpr; cv.height=w*dpr;
+  const g=cv.getContext("2d"); g.setTransform(w*dpr/S,0,0,w*dpr/S,0,0);
+  g.fillStyle="#F1EFE8"; g.fillRect(0,0,S,S); s.forEach(o=>shape(g,o));
+}
+function makePair(){
+  const a=gen(), b=a.map(o=>({...o}));
+  const n=Math.floor(Math.random()*(MAXD+1));
+  const idx=[...b.keys()].sort(()=>Math.random()-.5).slice(0,n);
+  const del=[];
+  idx.forEach(i=>{ const k=pick(["color","remove","shape","size"]), o=b[i];
+    if(k==="color") o.c=pick(C.filter(c=>c!==o.c));
+    else if(k==="shape") o.t=pick(T.filter(t=>t!==o.t));
+    else if(k==="size") o.r=o.r>22?o.r*.6:o.r*1.5;
+    else del.push(i);
+  });
+  return {left:a, right:b.filter((o,i)=>!del.includes(i)), count:n};
+}
+
+const WORDS = {zero:0,"0":0,one:1,won:1,"1":1,two:2,to:2,too:2,"2":2,three:3,"3":3,four:4,for:4,"4":4,five:5,"5":5};
+function parseNum(text){
+  for(const w of text.toLowerCase().split(/[^a-z0-9]+/)) if(w in WORDS) return WORDS[w];
+  return null;
+}
+
+let pairs=[], cur=0, correct=0, t0=0, running=false, rec=null, consumed=-1;
+
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); }
+function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
+
+function answer(n){
+  if(n===pairs[cur].count) correct++;
+  cur++;
+  if(cur>=PAIRS) return finish();
+  showPair();
+}
+function finish(){
+  running=false;
+  const secs=(performance.now()-t0)/1000;
+  try{ rec.abort(); }catch(e){}
+  document.getElementById("score").textContent=correct+" of "+PAIRS+" correct";
+  document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
+  show("done");
+}
+
+function startRec(){
+  consumed=-1;
+  try{ rec.start(); }catch(e){}
+}
+
+document.getElementById("startBtn").onclick=()=>{
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone."; return; }
+  rec=new SR();
+  rec.lang="en-US"; rec.continuous=true; rec.interimResults=true;
+  rec.onresult=e=>{
+    if(!running) return;
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(i<=consumed) continue;
+      const n=parseNum(e.results[i][0].transcript);
+      if(n!==null){ consumed=i; answer(n); if(!running) return; }
+    }
+  };
+  rec.onend=()=>{ if(running) startRec(); };
+  rec.onerror=e=>{
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+      running=false; show("start");
+      document.getElementById("err").textContent="Microphone access was denied.";
+    }
+  };
+  pairs=Array.from({length:PAIRS},makePair);
+  cur=0; correct=0; running=true;
+  show("play"); showPair();
+  t0=performance.now();
+  startRec();
+};
+</script>
+</body>
+</html>
