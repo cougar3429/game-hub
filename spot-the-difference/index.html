@@ -94,6 +94,7 @@ let pairs=[], cur=0, correct=0, t0=0, running=false, rec=null, consumed=-1;
 
 function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); }
 function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
+window.addEventListener("resize",()=>{ if(running && cur<PAIRS) showPair(); });
 
 function answer(n){
   if(n===pairs[cur].count) correct++;
