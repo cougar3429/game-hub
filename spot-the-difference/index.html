@@ -29,7 +29,6 @@
   .field{display:flex;align-items:center;gap:10px;font-size:18px}
   .field input[type=text]{font-size:18px;padding:8px 10px;border-radius:8px;border:1px solid #666;background:#222;color:#eee;width:180px}
   .field input[type=range]{width:180px}
-  .sub{display:flex;gap:14px;margin-left:32px;font-size:16px;color:#ccc}
   .msg{font-size:15px;color:#aaa;max-width:320px;line-height:1.5}
 </style>
 </head>
@@ -47,14 +46,10 @@
 <div id="options" class="screen">
   <div class="big">Differences</div>
   <div class="opts">
+    <label><input type="checkbox" id="allChk" checked>All</label>
     <label><input type="checkbox" name="type" value="color" checked>Color</label>
     <label><input type="checkbox" name="type" value="shape" checked>Shape</label>
     <label><input type="checkbox" name="type" value="size" checked>Size</label>
-    <div class="sub">
-      <label><input type="radio" name="sizeAmt" value="subtle">Subtle</label>
-      <label><input type="radio" name="sizeAmt" value="medium" checked>Medium</label>
-      <label><input type="radio" name="sizeAmt" value="obvious">Obvious</label>
-    </div>
     <label><input type="checkbox" name="type" value="remove" checked>Missing object</label>
     <label><input type="checkbox" name="type" value="rotate" checked>Rotation</label>
   </div>
@@ -164,13 +159,12 @@ music.addEventListener("ended", playRandom);
 function store(k,v){ try{ localStorage.setItem("std_"+k, JSON.stringify(v)); }catch(e){} }
 function load(k){ try{ const v=localStorage.getItem("std_"+k); return v===null?null:JSON.parse(v); }catch(e){ return null; } }
 
-const SIZES = {subtle:{shrink:.8,grow:1.25}, medium:{shrink:.6,grow:1.5}, obvious:{shrink:.45,grow:1.9}};
+const SIZE = {shrink:.55, grow:1.6};
 const ROT = {square:Math.PI/4, tri:Math.PI/3, star:Math.PI/5};
 
 function getOpts(){
   return {
-    types:[...document.querySelectorAll('input[name="type"]:checked')].map(i=>i.value),
-    size:document.querySelector('input[name="sizeAmt"]:checked').value
+    types:[...document.querySelectorAll('input[name="type"]:checked')].map(i=>i.value)
   };
 }
 function fits(x,y,r,others){
@@ -190,7 +184,7 @@ function makePair(opts){
     if(k==="color") o.c=pick(C.filter(c=>c!==o.c));
     else if(k==="shape") o.t=pick(T.filter(t=>t!==o.t));
     else if(k==="size"){
-      const f=SIZES[opts.size], g=o.r*f.grow;
+      const f=SIZE, g=o.r*f.grow;
       if(o.r<=22 && fits(o.x,o.y,g,a.filter((q,j)=>j!==i))) o.r=g; else o.r*=f.shrink;
     }
     else if(k==="rotate") o.a+=ROT[o.t];
@@ -269,10 +263,13 @@ function micCheck(){
   const valid=types?[...document.querySelectorAll('input[name="type"]')].filter(i=>types.includes(i.value)):[];
   if(valid.length) document.querySelectorAll('input[name="type"]').forEach(i=>i.checked=types.includes(i.value));
   const voice=load("voice"); if(voice!==null) document.querySelectorAll(".voiceChk").forEach(c=>c.checked=voice);
-  const size=load("size"); if(size){ const r=document.querySelector('input[name="sizeAmt"][value="'+size+'"]'); if(r) r.checked=true; }
 })();
-function saveOpts(){ const o=getOpts(); if(o.types.length) store("types",o.types); store("size",o.size); }
-document.querySelectorAll('input[name="type"],input[name="sizeAmt"]').forEach(i=>i.addEventListener("change",saveOpts));
+function saveOpts(){ const o=getOpts(); if(o.types.length) store("types",o.types); }
+const typeBoxes=[...document.querySelectorAll('input[name="type"]')], allChk=document.getElementById("allChk");
+function syncAll(){ allChk.checked=typeBoxes.every(b=>b.checked); }
+typeBoxes.forEach(i=>i.addEventListener("change",()=>{ syncAll(); saveOpts(); }));
+allChk.addEventListener("change",()=>{ typeBoxes.forEach(b=>b.checked=allChk.checked); document.getElementById("optErr").textContent=""; saveOpts(); });
+syncAll();
 document.getElementById("nameIn").addEventListener("input",e=>store("name",e.target.value));
 document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); if(!running) setMusicVol(e.target.value/100); });
 music.volume=sliderVol();
