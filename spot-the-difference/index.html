@@ -20,6 +20,9 @@
   .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
   .opts label{display:flex;align-items:center;gap:10px}
   .opts input{width:22px;height:22px}
+  .field{display:flex;align-items:center;gap:10px;font-size:18px}
+  .field input[type=text]{font-size:18px;padding:8px 10px;border-radius:8px;border:1px solid #666;background:#222;color:#eee;width:180px}
+  .field input[type=range]{width:180px}
   .sub{display:flex;gap:14px;margin-left:32px;font-size:16px;color:#ccc}
   .msg{font-size:15px;color:#aaa;max-width:320px;line-height:1.5}
 </style>
@@ -27,6 +30,8 @@
 <body>
 
 <div id="start" class="screen on">
+  <label class="field">Name <input type="text" id="nameIn" maxlength="20" autocomplete="off"></label>
+  <label class="field">Music <input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
   <div class="msg">Say how many differences you see in each pair (0 to 5).</div>
   <button id="startBtn">Start</button>
   <button id="optBtn">Options</button>
@@ -98,6 +103,10 @@ function draw(id,s,marks){
   g.fillStyle="#F1EFE8"; g.fillRect(0,0,S,S); s.forEach(o=>shape(g,o));
   if(marks){ g.strokeStyle="#000"; g.lineWidth=4; marks.forEach(m=>{ g.beginPath(); g.arc(m.x,m.y,m.r+8,0,7); g.stroke(); }); }
 }
+const music = new Audio("music.mp3"); music.loop = true;
+function store(k,v){ try{ localStorage.setItem("std_"+k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v=localStorage.getItem("std_"+k); return v===null?null:JSON.parse(v); }catch(e){ return null; } }
+
 const SIZES = {subtle:{shrink:.8,grow:1.25}, medium:{shrink:.6,grow:1.5}, obvious:{shrink:.45,grow:1.9}};
 const ROT = {square:Math.PI/4, tri:Math.PI/3, star:Math.PI/5};
 
@@ -202,6 +211,19 @@ if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     .catch(e=>{ document.getElementById("err").textContent="Microphone error: "+e.name; });
 }
 
+(function restore(){
+  const name=load("name"); if(name!==null) document.getElementById("nameIn").value=name;
+  const vol=load("vol"); if(vol!==null) document.getElementById("vol").value=vol;
+  const types=load("types");
+  if(types && types.length) document.querySelectorAll('input[name="type"]').forEach(i=>i.checked=types.includes(i.value));
+  const size=load("size"); if(size){ const r=document.querySelector('input[name="sizeAmt"][value="'+size+'"]'); if(r) r.checked=true; }
+})();
+function saveOpts(){ const o=getOpts(); if(o.types.length) store("types",o.types); store("size",o.size); }
+document.querySelectorAll('input[name="type"],input[name="sizeAmt"]').forEach(i=>i.addEventListener("change",saveOpts));
+document.getElementById("nameIn").addEventListener("input",e=>store("name",e.target.value));
+document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); music.volume=e.target.value/100; });
+music.volume=document.getElementById("vol").value/100;
+
 document.getElementById("optBtn").onclick=()=>{ document.getElementById("optErr").textContent=""; show("options"); };
 document.getElementById("backBtn").onclick=()=>{
   if(!getOpts().types.length){ document.getElementById("optErr").textContent="Pick at least one difference type."; return; }
@@ -213,6 +235,9 @@ document.getElementById("startBtn").onclick=()=>{
   const opts=getOpts();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone."; return; }
+  music.volume=document.getElementById("vol").value/100;
+  music.currentTime=0;
+  music.play().catch(()=>{});
   rec=new SR();
   rec.lang="en-US"; rec.continuous=true; rec.interimResults=true;
   rec.onresult=e=>{
@@ -227,7 +252,7 @@ document.getElementById("startBtn").onclick=()=>{
   rec.onend=()=>{ if(running) startRec(); };
   rec.onerror=e=>{
     if(e.error!=="no-speech"&&e.error!=="aborted"){
-      running=false; show("start");
+      running=false; music.pause(); show("start");
       document.getElementById("err").textContent="Speech recognition error: "+e.error;
     }
   };
