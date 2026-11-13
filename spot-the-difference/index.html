@@ -115,6 +115,12 @@ function startRec(){
   try{ rec.start(); }catch(e){}
 }
 
+if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+  navigator.mediaDevices.getUserMedia({audio:true})
+    .then(stream=>stream.getTracks().forEach(t=>t.stop()))
+    .catch(e=>{ document.getElementById("err").textContent="Microphone error: "+e.name; });
+}
+
 document.getElementById("startBtn").onclick=()=>{
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone."; return; }
@@ -130,9 +136,9 @@ document.getElementById("startBtn").onclick=()=>{
   };
   rec.onend=()=>{ if(running) startRec(); };
   rec.onerror=e=>{
-    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+    if(e.error!=="no-speech"&&e.error!=="aborted"){
       running=false; show("start");
-      document.getElementById("err").textContent="Microphone access was denied.";
+      document.getElementById("err").textContent="Speech recognition error: "+e.error;
     }
   };
   pairs=Array.from({length:PAIRS},makePair);
