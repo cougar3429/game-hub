@@ -17,6 +17,8 @@
   canvas{width:min(44vw,220px);height:min(44vw,220px);border-radius:4px}
   button{font-size:18px;padding:12px 28px;border-radius:8px;border:1px solid #666;background:#222;color:#eee}
   .big{font-size:28px}
+  .wrap{position:relative}
+  .cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:#eee}
   .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
   .opts label{display:flex;align-items:center;gap:10px}
   .opts input{width:22px;height:22px}
@@ -31,7 +33,6 @@
 
 <div id="start" class="screen on">
   <label class="field">Name <input type="text" id="nameIn" maxlength="20" autocomplete="off"></label>
-  <label class="field">Music <input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
   <div class="msg">Say how many differences you see in each pair (0 to 5).</div>
   <button id="startBtn">Start</button>
   <button id="optBtn">Options</button>
@@ -51,22 +52,24 @@
     </div>
     <label><input type="checkbox" name="type" value="remove" checked>Missing object</label>
     <label><input type="checkbox" name="type" value="rotate" checked>Rotation</label>
-    <label><input type="checkbox" name="type" value="extra" checked>Extra object</label>
   </div>
+  <label class="field">Music <input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
   <div id="optErr" class="msg"></div>
   <button id="backBtn">Back</button>
 </div>
 
 <div id="play" class="screen">
   <div class="pair">
-    <div class="eye"><div class="dot"></div><canvas id="L"></canvas></div>
-    <div class="eye"><div class="dot"></div><canvas id="R"></canvas></div>
+    <div class="eye"><div class="dot"></div><div class="wrap"><canvas id="L"></canvas><div class="cd"></div></div></div>
+    <div class="eye"><div class="dot"></div><div class="wrap"><canvas id="R"></canvas><div class="cd"></div></div></div>
   </div>
 </div>
 
 <div id="done" class="screen">
   <div id="score" class="big"></div>
   <div id="time" class="big"></div>
+  <button id="newBtn">New Game</button>
+  <button id="menuBtn">Main Menu</button>
   <div id="recap"></div>
 </div>
 
@@ -103,7 +106,41 @@ function draw(id,s,marks){
   g.fillStyle="#F1EFE8"; g.fillRect(0,0,S,S); s.forEach(o=>shape(g,o));
   if(marks){ g.strokeStyle="#000"; g.lineWidth=4; marks.forEach(m=>{ g.beginPath(); g.arc(m.x,m.y,m.r+8,0,7); g.stroke(); }); }
 }
-const music = new Audio("music.mp3"); music.loop = true;
+const TRACKS = ["music/do-you-feel-it-too.mp3","music/the-lounge.mp3","music/be-with-you-eternal-mix.mp3","music/transcend-the-universe.mp3"];
+const music = new Audio();
+let fadeId=0;
+function playRandom(){ fadeId++; music.volume=document.getElementById("vol").value/100; music.src=pick(TRACKS); music.play().catch(()=>{}); }
+function fadeOut(ms){
+  const id=++fadeId, v0=music.volume, t0=performance.now();
+  (function step(){
+    if(id!==fadeId) return;
+    const k=Math.min(1,(performance.now()-t0)/ms);
+    music.volume=v0*(1-k);
+    if(k<1) requestAnimationFrame(step); else music.pause();
+  })();
+}
+let actx=null;
+function beep(){
+  if(!actx) return;
+  const o=actx.createOscillator(), g=actx.createGain(), t=actx.currentTime;
+  o.type="sine"; o.frequency.value=880;
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.4,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.16);
+}
+function ding(){
+  if(!actx) return 0;
+  const t=actx.currentTime, f=1046.5;
+  [[1,0.35,1.6],[2.76,0.12,0.9],[5.4,0.06,0.5],[2,0.10,1.2]].forEach(([m,amp,dec])=>{
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.value=f*m;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(amp,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+dec);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dec+0.05);
+  });
+  return 1600;
+}
+function menuMusic(){ if(!running && music.paused) playRandom(); }
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,e=>{ if(e.target.id!=="startBtn") menuMusic(); }));
+music.addEventListener("ended", playRandom);
 function store(k,v){ try{ localStorage.setItem("std_"+k, JSON.stringify(v)); }catch(e){} }
 function load(k){ try{ const v=localStorage.getItem("std_"+k); return v===null?null:JSON.parse(v); }catch(e){ return null; } }
 
@@ -120,24 +157,13 @@ function fits(x,y,r,others){
   if(x-r<4||y-r<4||x+r>S-4||y+r>S-4) return false;
   return others.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+4);
 }
-function freeSpot(others){
-  for(let t=0;t<200;t++){
-    const r=rnd(14,30), x=rnd(r+6,S-r-6), y=rnd(r+6,S-r-6);
-    if(others.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+8)) return {x,y,r,c:pick(C),t:pick(T),a:rnd(0,6.28)};
-  }
-  return null;
-}
 function makePair(opts){
   const a=gen(), b=a.map(o=>({...o}));
   const n=Math.floor(Math.random()*(MAXD+1));
-  const used=new Set(), del=[], extra=[], marks=[];
+  const used=new Set(), del=[], marks=[];
   let made=0, guard=0;
   while(made<n && guard<200){ guard++;
     const k=pick(opts.types);
-    if(k==="extra"){
-      const o=freeSpot(a.concat(extra)); if(!o) continue;
-      extra.push(o); marks.push({x:o.x,y:o.y,r:o.r}); made++; continue;
-    }
     const free=[...b.keys()].filter(i=>!used.has(i) && (k!=="rotate" || ROT[b[i].t]));
     if(!free.length) continue;
     const i=pick(free), o=b[i];
@@ -145,13 +171,13 @@ function makePair(opts){
     else if(k==="shape") o.t=pick(T.filter(t=>t!==o.t));
     else if(k==="size"){
       const f=SIZES[opts.size], g=o.r*f.grow;
-      if(o.r<=22 && fits(o.x,o.y,g,a.filter((q,j)=>j!==i).concat(extra))) o.r=g; else o.r*=f.shrink;
+      if(o.r<=22 && fits(o.x,o.y,g,a.filter((q,j)=>j!==i))) o.r=g; else o.r*=f.shrink;
     }
     else if(k==="rotate") o.a+=ROT[o.t];
     else del.push(i);
     used.add(i); marks.push({x:o.x,y:o.y,r:Math.max(o.r,a[i].r)}); made++;
   }
-  return {left:a, right:b.filter((o,i)=>!del.includes(i)).concat(extra), count:made, marks};
+  return {left:a, right:b.filter((o,i)=>!del.includes(i)), count:made, marks};
 }
 
 const WORDS = {zero:0,"0":0,one:1,won:1,"1":1,two:2,to:2,too:2,"2":2,three:3,"3":3,four:4,for:4,"4":4,five:5,"5":5};
@@ -163,11 +189,12 @@ function parseNum(text){
 let pairs=[], answers=[], cur=0, correct=0, t0=0, running=false, ready=false, rec=null, consumed=-1;
 const ALIGN_MS=2000;
 
-function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); }
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); window.scrollTo(0,0); }
 function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
 window.addEventListener("resize",()=>{ if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS) drawRecap(); });
 
 function answer(n){
+  beep();
   answers[cur]=n;
   if(n===pairs[cur].count) correct++;
   cur++;
@@ -182,6 +209,8 @@ function finish(){
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
   buildRecap();
   show("done");
+  if(correct===PAIRS){ const ms=ding(); setTimeout(()=>{ if(!running && music.paused) playRandom(); }, ms); }
+  else playRandom();
   drawRecap();
 }
 function buildRecap(){
@@ -215,13 +244,14 @@ if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
   const name=load("name"); if(name!==null) document.getElementById("nameIn").value=name;
   const vol=load("vol"); if(vol!==null) document.getElementById("vol").value=vol;
   const types=load("types");
-  if(types && types.length) document.querySelectorAll('input[name="type"]').forEach(i=>i.checked=types.includes(i.value));
+  const valid=types?[...document.querySelectorAll('input[name="type"]')].filter(i=>types.includes(i.value)):[];
+  if(valid.length) document.querySelectorAll('input[name="type"]').forEach(i=>i.checked=types.includes(i.value));
   const size=load("size"); if(size){ const r=document.querySelector('input[name="sizeAmt"][value="'+size+'"]'); if(r) r.checked=true; }
 })();
 function saveOpts(){ const o=getOpts(); if(o.types.length) store("types",o.types); store("size",o.size); }
 document.querySelectorAll('input[name="type"],input[name="sizeAmt"]').forEach(i=>i.addEventListener("change",saveOpts));
 document.getElementById("nameIn").addEventListener("input",e=>store("name",e.target.value));
-document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); music.volume=e.target.value/100; });
+document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); if(!running) music.volume=e.target.value/100; });
 music.volume=document.getElementById("vol").value/100;
 
 document.getElementById("optBtn").onclick=()=>{ document.getElementById("optErr").textContent=""; show("options"); };
@@ -231,13 +261,15 @@ document.getElementById("backBtn").onclick=()=>{
 };
 document.querySelectorAll('input[name="type"]').forEach(i=>i.onchange=()=>{ document.getElementById("optErr").textContent=""; });
 
-document.getElementById("startBtn").onclick=()=>{
+document.getElementById("menuBtn").onclick=()=>{ document.getElementById("err").textContent=""; show("start"); };
+document.getElementById("newBtn").onclick=()=>startGame();
+document.getElementById("startBtn").onclick=()=>startGame();
+function startGame(){
   const opts=getOpts();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone."; return; }
-  music.volume=document.getElementById("vol").value/100;
-  music.currentTime=0;
-  music.play().catch(()=>{});
+  fadeOut(500);
+  try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); actx.resume(); }catch(e){}
   rec=new SR();
   rec.lang="en-US"; rec.continuous=true; rec.interimResults=true;
   rec.onresult=e=>{
@@ -252,7 +284,7 @@ document.getElementById("startBtn").onclick=()=>{
   rec.onend=()=>{ if(running) startRec(); };
   rec.onerror=e=>{
     if(e.error!=="no-speech"&&e.error!=="aborted"){
-      running=false; music.pause(); show("start");
+      running=false; show("start"); menuMusic();
       document.getElementById("err").textContent="Speech recognition error: "+e.error;
     }
   };
@@ -262,14 +294,20 @@ document.getElementById("startBtn").onclick=()=>{
   cvs.forEach(c=>c.style.visibility="hidden");
   show("play");
   startRec();
+  const cds=document.querySelectorAll("#play .cd"), step=ALIGN_MS/3;
+  const setCd=t=>cds.forEach(d=>d.textContent=t);
+  setCd("2");
+  setTimeout(()=>{ if(running) setCd("1"); }, step);
+  setTimeout(()=>{ if(running) setCd("Go!"); }, step*2);
   setTimeout(()=>{
+    setCd("");
     if(!running) return;
     showPair();
     cvs.forEach(c=>c.style.visibility="visible");
     ready=true;
     t0=performance.now();
   },ALIGN_MS);
-};
+}
 </script>
 </body>
 </html>
