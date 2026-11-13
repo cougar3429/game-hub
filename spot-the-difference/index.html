@@ -18,6 +18,11 @@
   button{font-size:18px;padding:12px 28px;border-radius:8px;border:1px solid #666;background:#222;color:#eee}
   .big{font-size:28px}
   .wrap{position:relative}
+  .logo{line-height:1;margin-bottom:12px;font-weight:900;letter-spacing:.04em}
+  .logo .l1{font-size:26px;color:#F1EFE8}
+  .logo .l2{font-size:44px;color:#EF9F27}
+  .logo .odd{color:#378ADD}
+  .hdr{font-size:36px;font-weight:800;margin-bottom:4px}
   #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start}
   #bigAns{flex:1;width:100%;display:grid;grid-template-columns:repeat(2,auto);grid-template-rows:repeat(3,auto);padding-left:8px;padding-right:8px;justify-content:space-between;align-content:space-evenly;padding-top:12px;padding-bottom:12px;box-sizing:border-box;visibility:hidden}
   #bigAns button{width:84px;height:84px;padding:0;font-size:38px;font-weight:600;background:#C62828;border:none;color:#fff;border-radius:14px}
@@ -35,6 +40,7 @@
 <body>
 
 <div id="start" class="screen on">
+  <div class="logo"><div class="l1">SPOT THE</div><div class="l2">DIFF<span class="odd">E</span>RENCE</div></div>
   <label class="field">Name <input type="text" id="nameIn" maxlength="20" autocomplete="off"></label>
   <div class="msg">Say or tap how many differences you see in each pair (0 to 5).</div>
   <button id="startBtn">Start</button>
@@ -44,6 +50,7 @@
 </div>
 
 <div id="options" class="screen">
+  <div class="hdr">Options</div>
   <div class="big">Differences</div>
   <div class="opts">
     <label><input type="checkbox" id="allChk" checked>All</label>
