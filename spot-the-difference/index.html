@@ -377,7 +377,7 @@ document.querySelectorAll("#bigAns button").forEach(b=>b.onclick=()=>{ if(runnin
 document.getElementById("menuBtn").onclick=()=>{ document.getElementById("err").textContent=""; show("start"); };
 document.getElementById("newBtn").onclick=()=>startGame();
 document.getElementById("startBtn").onclick=()=>startGame();
-const TAP_PAD_PX=20;
+const TAP_PAD_PX=30;
 let mode=load("mode")==="speed"?"speed":"classic", gameMode=mode;
 const HOWTO={classic:"Say or tap how many differences you see in each pair (0 to 5).", speed:"Each pair has one difference. Tap it on either picture."};
 function setMode(m){
