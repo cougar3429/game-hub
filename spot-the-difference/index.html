@@ -112,18 +112,30 @@ function draw(id,s,marks){
 }
 const TRACKS = ["music/do-you-feel-it-too.mp3","music/the-lounge.mp3","music/be-with-you-eternal-mix.mp3","music/transcend-the-universe.mp3"];
 const music = new Audio();
-let fadeId=0;
-function playRandom(){ fadeId++; music.volume=document.getElementById("vol").value/100; music.src=pick(TRACKS); music.play().catch(()=>{}); }
-function fadeOut(ms){
-  const id=++fadeId, v0=music.volume, t0=performance.now();
-  (function step(){
-    if(id!==fadeId) return;
-    const k=Math.min(1,(performance.now()-t0)/ms);
-    music.volume=v0*(1-k);
-    if(k<1) requestAnimationFrame(step); else music.pause();
-  })();
+const FADE_MS=1000;
+let actx=null, musicGain=null, fadeTimer=null;
+function ensureAudio(){
+  try{
+    if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(!musicGain){ musicGain=actx.createGain(); actx.createMediaElementSource(music).connect(musicGain); musicGain.connect(actx.destination); }
+    actx.resume();
+  }catch(e){}
 }
-let actx=null;
+function sliderVol(){ return document.getElementById("vol").value/100; }
+function setMusicVol(v){
+  if(musicGain){ const t=actx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(v,t); music.volume=1; }
+  else music.volume=v;
+}
+function playRandom(){ clearTimeout(fadeTimer); setMusicVol(sliderVol()); music.src=pick(TRACKS); music.play().catch(()=>{}); }
+function fadeOut(ms){
+  clearTimeout(fadeTimer);
+  if(musicGain){
+    const t=actx.currentTime, g=musicGain.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(0,t+ms/1000);
+  } else music.volume=0;
+  fadeTimer=setTimeout(()=>music.pause(), ms);
+}
+
 function beep(){
   if(!actx) return;
   const o=actx.createOscillator(), g=actx.createGain(), t=actx.currentTime;
@@ -131,43 +143,14 @@ function beep(){
   g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.4,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
   o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.16);
 }
-function ding(){
-  if(!actx) return 0;
-  const t0=actx.currentTime+0.05;
-  const comp=actx.createDynamicsCompressor(); comp.connect(actx.destination);
-  const master=actx.createGain(); master.gain.value=0.9; master.connect(comp);
-  const hz=m=>440*Math.pow(2,(m-69)/12);
-  function brass(m,start,dur,amp){
-    const lp=actx.createBiquadFilter(); lp.type="lowpass"; lp.Q.value=1;
-    lp.frequency.setValueAtTime(600,start); lp.frequency.linearRampToValueAtTime(4000,start+0.06); lp.frequency.exponentialRampToValueAtTime(1800,start+dur);
-    const g=actx.createGain();
-    g.gain.setValueAtTime(0.0001,start); g.gain.exponentialRampToValueAtTime(amp,start+0.03);
-    g.gain.setValueAtTime(amp,start+dur*0.7); g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
-    lp.connect(g); g.connect(master);
-    [-6,6].forEach(det=>{
-      const o=actx.createOscillator(); o.type="sawtooth"; o.frequency.value=hz(m); o.detune.value=det;
-      const vib=actx.createOscillator(), vg=actx.createGain(); vib.frequency.value=5.5; vg.gain.value=dur>0.5?6:0;
-      vib.connect(vg); vg.connect(o.detune); vib.start(start); vib.stop(start+dur+0.05);
-      o.connect(lp); o.start(start); o.stop(start+dur+0.05);
-    });
-  }
-  function bell(m,start){
-    [[1,0.25,2.2],[2.76,0.08,1.2],[5.4,0.04,0.6]].forEach(([k,amp,dec])=>{
-      const o=actx.createOscillator(), g=actx.createGain(); o.type="sine"; o.frequency.value=hz(m)*k;
-      g.gain.setValueAtTime(0.0001,start); g.gain.exponentialRampToValueAtTime(amp,start+0.005); g.gain.exponentialRampToValueAtTime(0.0001,start+dec);
-      o.connect(g); g.connect(master); o.start(start); o.stop(start+dec+0.05);
-    });
-  }
-  const step=0.13;
-  [60,64,67,72].forEach((m,i)=>brass(m,t0+i*step,step*1.1,0.22));
-  brass(67,t0+4*step,step*0.9,0.22);
-  const tc=t0+5*step;
-  [60,64,67,72,76].forEach(m=>brass(m,tc,1.6,0.16));
-  brass(48,tc,1.6,0.18);
-  bell(84,tc); bell(88,tc+0.02);
-  return Math.round((5*step+1.7)*1000);
+const dingSnd = new Audio("sounds/level-ding.mp3"); dingSnd.preload="auto";
+function ding(done){
+  let finished=false; const end=()=>{ if(!finished){ finished=true; done(); } };
+  dingSnd.onended=end;
+  dingSnd.currentTime=0;
+  dingSnd.play().catch(end);
 }
-function menuMusic(){ if(!running && music.paused) playRandom(); }
+function menuMusic(){ if(!running && music.paused){ ensureAudio(); playRandom(); } }
 ["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,e=>{ if(e.target.id!=="startBtn") menuMusic(); }));
 music.addEventListener("ended", playRandom);
 function store(k,v){ try{ localStorage.setItem("std_"+k, JSON.stringify(v)); }catch(e){} }
@@ -238,7 +221,7 @@ function finish(){
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
   buildRecap();
   show("done");
-  if(correct===PAIRS){ const ms=ding(); setTimeout(()=>{ if(!running && music.paused) playRandom(); }, ms); }
+  if(correct===PAIRS) ding(()=>{ if(!running && music.paused) playRandom(); });
   else playRandom();
   drawRecap();
 }
@@ -283,8 +266,8 @@ function micCheck(){
 function saveOpts(){ const o=getOpts(); if(o.types.length) store("types",o.types); store("size",o.size); }
 document.querySelectorAll('input[name="type"],input[name="sizeAmt"]').forEach(i=>i.addEventListener("change",saveOpts));
 document.getElementById("nameIn").addEventListener("input",e=>store("name",e.target.value));
-document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); if(!running) music.volume=e.target.value/100; });
-music.volume=document.getElementById("vol").value/100;
+document.getElementById("vol").addEventListener("input",e=>{ store("vol",+e.target.value); if(!running) setMusicVol(e.target.value/100); });
+music.volume=sliderVol();
 document.querySelectorAll(".voiceChk").forEach(c=>c.addEventListener("change",()=>{
   document.querySelectorAll(".voiceChk").forEach(o=>o.checked=c.checked);
   store("voice",c.checked);
@@ -309,8 +292,9 @@ function startGame(){
   const voice=voiceOn();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(voice && !SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone, or turn off Voice."; return; }
-  fadeOut(500);
-  try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); actx.resume(); }catch(e){}
+  ensureAudio();
+  fadeOut(FADE_MS);
+  dingSnd.pause();
   rec=null;
   if(voice){
   rec=new SR();
@@ -339,7 +323,7 @@ function startGame(){
   cvs.forEach(c=>c.style.visibility="hidden");
   ansRows.forEach(r=>r.style.visibility="hidden");
   show("play");
-  if(rec) startRec();
+  if(rec) setTimeout(()=>{ if(running) startRec(); }, FADE_MS);
   const cds=document.querySelectorAll("#play .cd"), step=ALIGN_MS/3;
   const setCd=t=>cds.forEach(d=>d.textContent=t);
   setCd("2");
