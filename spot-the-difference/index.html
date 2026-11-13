@@ -14,7 +14,15 @@
   .pair{display:flex;gap:10px;justify-content:center}
   .eye{display:flex;flex-direction:column;align-items:center;gap:8px}
   .dot{width:8px;height:8px;border-radius:50%;background:#fff}
-  canvas{width:min(44vw,220px);height:min(44vw,220px);border-radius:4px}
+  :root{--pic:220px}
+  canvas{width:min(44vw,var(--pic));height:min(44vw,var(--pic));border-radius:4px}
+  .sizer{display:flex;flex-direction:column;align-items:stretch;width:min(92vw,360px)}
+  .sizer .top{display:flex;align-items:center;gap:8px;font-size:15px;color:#ccc}
+  .sizer input{flex:1;margin:0}
+  .sizer .ticks{display:flex;justify-content:space-between;font-size:11px;color:#888;padding:0 6px 0 46px}
+  #play .sizer{margin-top:auto;padding-bottom:6px}
+  body.speedPlay #bigAns{display:none}
+  #play .sizer .top{font-size:12px}
   button{font-size:18px;padding:12px 28px;border-radius:8px;border:1px solid #666;background:#222;color:#eee}
   .big{font-size:28px}
   .wrap{position:relative}
@@ -22,6 +30,11 @@
   .logo .l1{font-size:26px;color:#F1EFE8}
   .logo .l2{font-size:44px;color:#EF9F27}
   .logo .odd{color:#378ADD}
+  .modes{display:flex;gap:0}
+  .modes button{border-radius:0;min-width:110px}
+  .modes button:first-child{border-radius:8px 0 0 8px}
+  .modes button:last-child{border-radius:0 8px 8px 0}
+  .modes button.sel{background:#EF9F27;color:#111;border-color:#EF9F27;font-weight:700}
   .hdr{font-size:36px;font-weight:800;margin-bottom:4px}
   #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start}
   #bigAns{flex:1;width:100%;display:grid;grid-template-columns:repeat(2,auto);grid-template-rows:repeat(3,auto);padding-left:8px;padding-right:8px;justify-content:space-between;align-content:space-evenly;padding-top:12px;padding-bottom:12px;box-sizing:border-box;visibility:hidden}
@@ -32,8 +45,14 @@
   #bigAns button[data-n="3"]{background:#2E7D32}
   #bigAns button[data-n="4"]{background:#1565C0}
   #bigAns button[data-n="5"]{background:#7B1FA2}
+  @media (orientation:landscape){
+    canvas{width:min(44vw,var(--pic),calc(100vh - 190px));height:min(44vw,var(--pic),calc(100vh - 190px))}
+    body.speedPlay canvas{width:min(44vw,var(--pic),calc(100vh - 100px));height:min(44vw,var(--pic),calc(100vh - 100px))}
+    #bigAns button{width:64px;height:64px;font-size:30px}
+    #play .sizer{padding-bottom:2px}
+  }
   @media (orientation:landscape){ #bigAns{grid-template-columns:repeat(6,auto);grid-template-rows:auto;padding-left:8px;padding-right:8px} }
-  .cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:#eee}
+  .cd{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:48px;color:#eee}
   .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
   .opts label{display:flex;align-items:center;gap:10px}
   .opts input{width:22px;height:22px}
@@ -48,7 +67,8 @@
 <div id="start" class="screen on">
   <div class="logo"><div class="l1">SPOT THE</div><div class="l2">DIFF<span class="odd">E</span>RENCE</div></div>
   <label class="field">Name <input type="text" id="nameIn" maxlength="20" autocomplete="off"></label>
-  <div class="msg">Say or tap how many differences you see in each pair (0 to 5).</div>
+  <div class="modes"><button id="modeClassic">Classic</button><button id="modeSpeed">Speed</button></div>
+  <div class="msg" id="howTo"></div>
   <button id="startBtn">Start</button>
   <label class="field"><input type="checkbox" class="voiceChk" checked style="width:22px;height:22px">Voice</label>
   <button id="optBtn">Options</button>
@@ -69,6 +89,7 @@
   <label class="field"><input type="checkbox" class="voiceChk" checked style="width:22px;height:22px">Voice answers</label>
   <label class="field"><input type="checkbox" id="btnChk" checked style="width:22px;height:22px">Answer buttons</label>
   <label class="field">Music <input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
+  <div class="sizer"><div class="top"><span>Size</span><input type="range" class="sizeSl" min="1" max="10" step="1"></div><div class="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div></div>
   <div id="optErr" class="msg"></div>
   <button id="backBtn">Back</button>
 </div>
@@ -79,6 +100,7 @@
     <div class="eye"><div class="dot"></div><div class="wrap"><canvas id="R"></canvas><div class="cd"></div></div></div>
   </div>
   <div id="bigAns"><button data-n="0">0</button><button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button></div>
+  <div class="sizer"><div class="top"><span>Size</span><input type="range" class="sizeSl" min="1" max="10" step="1"></div><div class="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div></div>
 </div>
 
 <div id="done" class="screen">
@@ -185,9 +207,9 @@ function fits(x,y,r,others){
   if(x-r<4||y-r<4||x+r>S-4||y+r>S-4) return false;
   return others.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+4);
 }
-function makePair(opts){
+function makePair(opts, forceN){
   const a=gen(), b=a.map(o=>({...o}));
-  const n=Math.floor(Math.random()*(MAXD+1));
+  const n=forceN!==undefined?forceN:Math.floor(Math.random()*(MAXD+1));
   const used=new Set(), del=[], marks=[];
   let made=0, guard=0;
   while(made<n && guard<200){ guard++;
@@ -217,6 +239,18 @@ function parseNum(text){
 let pairs=[], answers=[], cur=0, correct=0, t0=0, running=false, ready=false, rec=null, consumed=-1;
 const ALIGN_MS=2000;
 
+const SIZE_PX=v=>120+(v-1)*25;
+const landMQ=window.matchMedia("(orientation: landscape)");
+function curSize(){ const v=load("picSize"); return v!==null?v:5; }
+function applySize(redraw){
+  const v=curSize();
+  document.documentElement.style.setProperty("--pic",SIZE_PX(v)+"px");
+  document.querySelectorAll(".sizeSl").forEach(sl=>sl.value=v);
+  if(redraw){ if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS && pairs.length) drawRecap(); }
+}
+document.querySelectorAll(".sizeSl").forEach(sl=>sl.addEventListener("input",()=>{ store("picSize",+sl.value); applySize(true); }));
+landMQ.addEventListener("change",()=>applySize(true));
+applySize(false);
 function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); window.scrollTo(0,0); }
 function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
 window.addEventListener("resize",()=>{ if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS) drawRecap(); });
@@ -229,6 +263,24 @@ function answer(n){
   if(cur>=PAIRS) return finish();
   showPair();
 }
+function tapAnswer(hit){
+  beep();
+  answers[cur]=hit;
+  if(hit) correct++;
+  cur++;
+  if(cur>=PAIRS) return finish();
+  showPair();
+}
+["L","R"].forEach(id=>{
+  const cv=document.getElementById(id);
+  cv.addEventListener("pointerdown",e=>{
+    if(!running || !ready || gameMode!=="speed") return;
+    const rect=cv.getBoundingClientRect(), k=S/rect.width;
+    const x=(e.clientX-rect.left)*k, y=(e.clientY-rect.top)*k;
+    const m=pairs[cur].marks[0], pad=TAP_PAD_PX*k;
+    tapAnswer(Math.hypot(x-m.x,y-m.y)<=m.r+pad);
+  });
+});
 function finish(){
   running=false;
   const secs=(performance.now()-t0)/1000;
@@ -237,15 +289,16 @@ function finish(){
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
   buildRecap();
   show("done");
-  if(correct===PAIRS) ding(()=>{ if(!running && music.paused) playRandom(); });
-  else playRandom();
+  if(correct===PAIRS){ fadeOut(300); ding(()=>{ if(!running && music.paused) playRandom(); }); }
+  else if(music.paused) playRandom();
   drawRecap();
 }
 function buildRecap(){
   const box=document.getElementById("recap"); box.innerHTML="";
   pairs.forEach((p,i)=>{
     const d=document.createElement("div"); d.className="recap";
-    d.innerHTML='<div class="label">Pair '+(i+1)+': you said '+answers[i]+', actual '+p.count+'</div>'+
+    const label=gameMode==="speed"?(answers[i]?"correct":"missed"):"you said "+answers[i]+", actual "+p.count;
+    d.innerHTML='<div class="label">Pair '+(i+1)+': '+label+'</div>'+
       '<div class="pair"><div class="eye"><div class="dot"></div><canvas></canvas></div><div class="eye"><div class="dot"></div><canvas></canvas></div></div>';
     box.appendChild(d);
   });
@@ -311,14 +364,30 @@ document.querySelectorAll("#bigAns button").forEach(b=>b.onclick=()=>{ if(runnin
 document.getElementById("menuBtn").onclick=()=>{ document.getElementById("err").textContent=""; show("start"); };
 document.getElementById("newBtn").onclick=()=>startGame();
 document.getElementById("startBtn").onclick=()=>startGame();
+const TAP_PAD_PX=20;
+let mode=load("mode")==="speed"?"speed":"classic", gameMode=mode;
+const HOWTO={classic:"Say or tap how many differences you see in each pair (0 to 5).", speed:"Each pair has one difference. Tap it on either picture."};
+function setMode(m){
+  mode=m; store("mode",m);
+  document.getElementById("modeClassic").classList.toggle("sel",m==="classic");
+  document.getElementById("modeSpeed").classList.toggle("sel",m==="speed");
+  document.getElementById("howTo").textContent=HOWTO[m];
+  document.getElementById("err").textContent="";
+}
+document.getElementById("modeClassic").onclick=()=>setMode("classic");
+document.getElementById("modeSpeed").onclick=()=>setMode("speed");
+setMode(mode);
 function startGame(){
   const opts=getOpts();
-  const voice=voiceOn();
-  if(!voice && !btnChk.checked){ document.getElementById("err").textContent=NO_INPUT; return; }
+  gameMode=mode;
+  const speed=gameMode==="speed";
+  const voice=!speed && voiceOn();
+  if(!speed && !voice && !btnChk.checked){ document.getElementById("err").textContent=NO_INPUT; return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(voice && !SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone, or turn off Voice."; return; }
   ensureAudio();
-  fadeOut(FADE_MS);
+  if(!speed) fadeOut(FADE_MS);
+  else if(music.paused) playRandom();
   dingSnd.pause();
   rec=null;
   if(voice){
@@ -341,7 +410,8 @@ function startGame(){
     }
   };
   }
-  pairs=Array.from({length:PAIRS},()=>makePair(opts));
+  pairs=Array.from({length:PAIRS},()=>makePair(opts, speed?1:undefined));
+  document.body.classList.toggle("speedPlay", speed);
   answers=[]; cur=0; correct=0; running=true; ready=false;
   const cvs=[document.getElementById("L"),document.getElementById("R")];
   const ansRows=[document.getElementById("bigAns")];
@@ -359,7 +429,7 @@ function startGame(){
     if(!running) return;
     showPair();
     cvs.forEach(c=>c.style.visibility="visible");
-    if(btnChk.checked) ansRows.forEach(r=>r.style.visibility="visible");
+    if(!speed && btnChk.checked) ansRows.forEach(r=>r.style.visibility="visible");
     ready=true;
     t0=performance.now();
   },ALIGN_MS);
