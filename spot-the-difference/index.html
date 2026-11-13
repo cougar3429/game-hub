@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spot the Difference</title>
 <style>
-  html,body{margin:0;height:100%;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif}
-  body{display:flex;align-items:center;justify-content:center}
-  .screen{display:none;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:16px}
+  html,body{margin:0;min-height:100%;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif}
+  body{display:flex;min-height:100vh}
+  .screen{display:none;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:16px;margin:auto}
+  .recap{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:12px}
+  .label{font-size:16px;color:#aaa}
   .screen.on{display:flex}
   .pair{display:flex;gap:10px;justify-content:center}
   .eye{display:flex;flex-direction:column;align-items:center;gap:8px}
@@ -15,6 +17,10 @@
   canvas{width:min(44vw,220px);height:min(44vw,220px);border-radius:4px}
   button{font-size:18px;padding:12px 28px;border-radius:8px;border:1px solid #666;background:#222;color:#eee}
   .big{font-size:28px}
+  .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
+  .opts label{display:flex;align-items:center;gap:10px}
+  .opts input{width:22px;height:22px}
+  .sub{display:flex;gap:14px;margin-left:32px;font-size:16px;color:#ccc}
   .msg{font-size:15px;color:#aaa;max-width:320px;line-height:1.5}
 </style>
 </head>
@@ -23,7 +29,27 @@
 <div id="start" class="screen on">
   <div class="msg">Say how many differences you see in each pair (0 to 5).</div>
   <button id="startBtn">Start</button>
+  <button id="optBtn">Options</button>
   <div id="err" class="msg"></div>
+</div>
+
+<div id="options" class="screen">
+  <div class="big">Differences</div>
+  <div class="opts">
+    <label><input type="checkbox" name="type" value="color" checked>Color</label>
+    <label><input type="checkbox" name="type" value="shape" checked>Shape</label>
+    <label><input type="checkbox" name="type" value="size" checked>Size</label>
+    <div class="sub">
+      <label><input type="radio" name="sizeAmt" value="subtle">Subtle</label>
+      <label><input type="radio" name="sizeAmt" value="medium" checked>Medium</label>
+      <label><input type="radio" name="sizeAmt" value="obvious">Obvious</label>
+    </div>
+    <label><input type="checkbox" name="type" value="remove" checked>Missing object</label>
+    <label><input type="checkbox" name="type" value="rotate" checked>Rotation</label>
+    <label><input type="checkbox" name="type" value="extra" checked>Extra object</label>
+  </div>
+  <div id="optErr" class="msg"></div>
+  <button id="backBtn">Back</button>
 </div>
 
 <div id="play" class="screen">
@@ -36,6 +62,7 @@
 <div id="done" class="screen">
   <div id="score" class="big"></div>
   <div id="time" class="big"></div>
+  <div id="recap"></div>
 </div>
 
 <script>
@@ -64,24 +91,58 @@ function shape(g,o){
   else { for(let i=0;i<10;i++){ const rr=i%2?r*.45:r, an=i*Math.PI/5-Math.PI/2; g.lineTo(Math.cos(an)*rr,Math.sin(an)*rr); } g.closePath(); g.fill(); }
   g.restore();
 }
-function draw(id,s){
-  const cv=document.getElementById(id), dpr=window.devicePixelRatio||1, w=cv.clientWidth;
+function draw(id,s,marks){
+  const cv=typeof id==="string"?document.getElementById(id):id, dpr=window.devicePixelRatio||1, w=cv.clientWidth;
   cv.width=w*dpr; cv.height=w*dpr;
   const g=cv.getContext("2d"); g.setTransform(w*dpr/S,0,0,w*dpr/S,0,0);
   g.fillStyle="#F1EFE8"; g.fillRect(0,0,S,S); s.forEach(o=>shape(g,o));
+  if(marks){ g.strokeStyle="#000"; g.lineWidth=4; marks.forEach(m=>{ g.beginPath(); g.arc(m.x,m.y,m.r+8,0,7); g.stroke(); }); }
 }
-function makePair(){
+const SIZES = {subtle:{shrink:.8,grow:1.25}, medium:{shrink:.6,grow:1.5}, obvious:{shrink:.45,grow:1.9}};
+const ROT = {square:Math.PI/4, tri:Math.PI/3, star:Math.PI/5};
+
+function getOpts(){
+  return {
+    types:[...document.querySelectorAll('input[name="type"]:checked')].map(i=>i.value),
+    size:document.querySelector('input[name="sizeAmt"]:checked').value
+  };
+}
+function fits(x,y,r,others){
+  if(x-r<4||y-r<4||x+r>S-4||y+r>S-4) return false;
+  return others.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+4);
+}
+function freeSpot(others){
+  for(let t=0;t<200;t++){
+    const r=rnd(14,30), x=rnd(r+6,S-r-6), y=rnd(r+6,S-r-6);
+    if(others.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+r+8)) return {x,y,r,c:pick(C),t:pick(T),a:rnd(0,6.28)};
+  }
+  return null;
+}
+function makePair(opts){
   const a=gen(), b=a.map(o=>({...o}));
   const n=Math.floor(Math.random()*(MAXD+1));
-  const idx=[...b.keys()].sort(()=>Math.random()-.5).slice(0,n);
-  const del=[];
-  idx.forEach(i=>{ const k=pick(["color","remove","shape","size"]), o=b[i];
+  const used=new Set(), del=[], extra=[], marks=[];
+  let made=0, guard=0;
+  while(made<n && guard<200){ guard++;
+    const k=pick(opts.types);
+    if(k==="extra"){
+      const o=freeSpot(a.concat(extra)); if(!o) continue;
+      extra.push(o); marks.push({x:o.x,y:o.y,r:o.r}); made++; continue;
+    }
+    const free=[...b.keys()].filter(i=>!used.has(i) && (k!=="rotate" || ROT[b[i].t]));
+    if(!free.length) continue;
+    const i=pick(free), o=b[i];
     if(k==="color") o.c=pick(C.filter(c=>c!==o.c));
     else if(k==="shape") o.t=pick(T.filter(t=>t!==o.t));
-    else if(k==="size") o.r=o.r>22?o.r*.6:o.r*1.5;
+    else if(k==="size"){
+      const f=SIZES[opts.size], g=o.r*f.grow;
+      if(o.r<=22 && fits(o.x,o.y,g,a.filter((q,j)=>j!==i).concat(extra))) o.r=g; else o.r*=f.shrink;
+    }
+    else if(k==="rotate") o.a+=ROT[o.t];
     else del.push(i);
-  });
-  return {left:a, right:b.filter((o,i)=>!del.includes(i)), count:n};
+    used.add(i); marks.push({x:o.x,y:o.y,r:Math.max(o.r,a[i].r)}); made++;
+  }
+  return {left:a, right:b.filter((o,i)=>!del.includes(i)).concat(extra), count:made, marks};
 }
 
 const WORDS = {zero:0,"0":0,one:1,won:1,"1":1,two:2,to:2,too:2,"2":2,three:3,"3":3,four:4,for:4,"4":4,five:5,"5":5};
@@ -90,13 +151,15 @@ function parseNum(text){
   return null;
 }
 
-let pairs=[], cur=0, correct=0, t0=0, running=false, rec=null, consumed=-1;
+let pairs=[], answers=[], cur=0, correct=0, t0=0, running=false, ready=false, rec=null, consumed=-1;
+const ALIGN_MS=2000;
 
 function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); }
 function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
-window.addEventListener("resize",()=>{ if(running && cur<PAIRS) showPair(); });
+window.addEventListener("resize",()=>{ if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS) drawRecap(); });
 
 function answer(n){
+  answers[cur]=n;
   if(n===pairs[cur].count) correct++;
   cur++;
   if(cur>=PAIRS) return finish();
@@ -108,7 +171,24 @@ function finish(){
   try{ rec.abort(); }catch(e){}
   document.getElementById("score").textContent=correct+" of "+PAIRS+" correct";
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
+  buildRecap();
   show("done");
+  drawRecap();
+}
+function buildRecap(){
+  const box=document.getElementById("recap"); box.innerHTML="";
+  pairs.forEach((p,i)=>{
+    const d=document.createElement("div"); d.className="recap";
+    d.innerHTML='<div class="label">Pair '+(i+1)+': you said '+answers[i]+', actual '+p.count+'</div>'+
+      '<div class="pair"><div class="eye"><div class="dot"></div><canvas></canvas></div><div class="eye"><div class="dot"></div><canvas></canvas></div></div>';
+    box.appendChild(d);
+  });
+}
+function drawRecap(){
+  document.querySelectorAll("#recap .recap").forEach((d,i)=>{
+    const c=d.querySelectorAll("canvas");
+    draw(c[0],pairs[i].left,pairs[i].marks); draw(c[1],pairs[i].right,pairs[i].marks);
+  });
 }
 
 function startRec(){
@@ -122,13 +202,22 @@ if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     .catch(e=>{ document.getElementById("err").textContent="Microphone error: "+e.name; });
 }
 
+document.getElementById("optBtn").onclick=()=>{ document.getElementById("optErr").textContent=""; show("options"); };
+document.getElementById("backBtn").onclick=()=>{
+  if(!getOpts().types.length){ document.getElementById("optErr").textContent="Pick at least one difference type."; return; }
+  show("start");
+};
+document.querySelectorAll('input[name="type"]').forEach(i=>i.onchange=()=>{ document.getElementById("optErr").textContent=""; });
+
 document.getElementById("startBtn").onclick=()=>{
+  const opts=getOpts();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone."; return; }
   rec=new SR();
   rec.lang="en-US"; rec.continuous=true; rec.interimResults=true;
   rec.onresult=e=>{
     if(!running) return;
+    if(!ready){ consumed=e.results.length-1; return; }
     for(let i=e.resultIndex;i<e.results.length;i++){
       if(i<=consumed) continue;
       const n=parseNum(e.results[i][0].transcript);
@@ -142,11 +231,19 @@ document.getElementById("startBtn").onclick=()=>{
       document.getElementById("err").textContent="Speech recognition error: "+e.error;
     }
   };
-  pairs=Array.from({length:PAIRS},makePair);
-  cur=0; correct=0; running=true;
-  show("play"); showPair();
-  t0=performance.now();
+  pairs=Array.from({length:PAIRS},()=>makePair(opts));
+  answers=[]; cur=0; correct=0; running=true; ready=false;
+  const cvs=[document.getElementById("L"),document.getElementById("R")];
+  cvs.forEach(c=>c.style.visibility="hidden");
+  show("play");
   startRec();
+  setTimeout(()=>{
+    if(!running) return;
+    showPair();
+    cvs.forEach(c=>c.style.visibility="visible");
+    ready=true;
+    t0=performance.now();
+  },ALIGN_MS);
 };
 </script>
 </body>
