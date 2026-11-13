@@ -137,12 +137,21 @@ function shape(g,o){
   else { for(let i=0;i<10;i++){ const rr=i%2?r*.45:r, an=i*Math.PI/5-Math.PI/2; g.lineTo(Math.cos(an)*rr,Math.sin(an)*rr); } g.closePath(); g.fill(); }
   g.restore();
 }
-function draw(id,s,marks){
+function draw(id,s,marks,miss){
   const cv=typeof id==="string"?document.getElementById(id):id, dpr=window.devicePixelRatio||1, w=cv.clientWidth;
   cv.width=w*dpr; cv.height=w*dpr;
   const g=cv.getContext("2d"); g.setTransform(w*dpr/S,0,0,w*dpr/S,0,0);
   g.fillStyle="#F1EFE8"; g.fillRect(0,0,S,S); s.forEach(o=>shape(g,o));
-  if(marks){ g.strokeStyle="#000"; g.lineWidth=4; marks.forEach(m=>{ g.beginPath(); g.arc(m.x,m.y,m.r+8,0,7); g.stroke(); }); }
+  if(marks){ g.strokeStyle="#000"; g.lineWidth=6; marks.forEach(m=>{ g.beginPath(); g.arc(m.x,m.y,m.r+8,0,7); g.stroke(); }); }
+  if(miss){
+    const R=14, d=R*Math.SQRT1_2;
+    g.strokeStyle="#E00000"; g.lineCap="round";
+    g.lineWidth=6; g.beginPath(); g.arc(miss.x,miss.y,R,0,7); g.stroke();
+    g.lineWidth=4; g.beginPath();
+    g.moveTo(miss.x-d,miss.y-d); g.lineTo(miss.x+d,miss.y+d);
+    g.moveTo(miss.x+d,miss.y-d); g.lineTo(miss.x-d,miss.y+d); g.stroke();
+    g.lineCap="butt";
+  }
 }
 const TRACKS = ["music/do-you-feel-it-too.mp3","music/the-lounge.mp3","music/be-with-you-eternal-mix.mp3","music/transcend-the-universe.mp3"];
 const music = new Audio();
@@ -263,9 +272,11 @@ function answer(n){
   if(cur>=PAIRS) return finish();
   showPair();
 }
-function tapAnswer(hit){
+let taps=[];
+function tapAnswer(hit,x,y){
   beep();
   answers[cur]=hit;
+  taps[cur]={x,y};
   if(hit) correct++;
   cur++;
   if(cur>=PAIRS) return finish();
@@ -278,7 +289,7 @@ function tapAnswer(hit){
     const rect=cv.getBoundingClientRect(), k=S/rect.width;
     const x=(e.clientX-rect.left)*k, y=(e.clientY-rect.top)*k;
     const m=pairs[cur].marks[0], pad=TAP_PAD_PX*k;
-    tapAnswer(Math.hypot(x-m.x,y-m.y)<=m.r+pad);
+    tapAnswer(Math.hypot(x-m.x,y-m.y)<=m.r+pad, x, y);
   });
 });
 function finish(){
@@ -289,8 +300,8 @@ function finish(){
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
   buildRecap();
   show("done");
-  if(correct===PAIRS){ fadeOut(300); ding(()=>{ if(!running && music.paused) playRandom(); }); }
-  else if(music.paused) playRandom();
+  if(music.paused) playRandom();
+  if(correct===PAIRS) ding(()=>{});
   drawRecap();
 }
 function buildRecap(){
@@ -306,7 +317,8 @@ function buildRecap(){
 function drawRecap(){
   document.querySelectorAll("#recap .recap").forEach((d,i)=>{
     const c=d.querySelectorAll("canvas");
-    draw(c[0],pairs[i].left,pairs[i].marks); draw(c[1],pairs[i].right,pairs[i].marks);
+    const miss=(gameMode==="speed" && !answers[i]) ? taps[i] : null;
+    draw(c[0],pairs[i].left,pairs[i].marks,miss); draw(c[1],pairs[i].right,pairs[i].marks,miss);
   });
 }
 
@@ -412,7 +424,7 @@ function startGame(){
   }
   pairs=Array.from({length:PAIRS},()=>makePair(opts, speed?1:undefined));
   document.body.classList.toggle("speedPlay", speed);
-  answers=[]; cur=0; correct=0; running=true; ready=false;
+  answers=[]; taps=[]; cur=0; correct=0; running=true; ready=false;
   const cvs=[document.getElementById("L"),document.getElementById("R")];
   const ansRows=[document.getElementById("bigAns")];
   cvs.forEach(c=>c.style.visibility="hidden");
