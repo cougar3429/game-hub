@@ -26,6 +26,12 @@
   #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start}
   #bigAns{flex:1;width:100%;display:grid;grid-template-columns:repeat(2,auto);grid-template-rows:repeat(3,auto);padding-left:8px;padding-right:8px;justify-content:space-between;align-content:space-evenly;padding-top:12px;padding-bottom:12px;box-sizing:border-box;visibility:hidden}
   #bigAns button{width:84px;height:84px;padding:0;font-size:38px;font-weight:600;background:#C62828;border:none;color:#fff;border-radius:14px}
+  #bigAns button[data-n="0"]{background:#D32F2F}
+  #bigAns button[data-n="1"]{background:#EF6C00}
+  #bigAns button[data-n="2"]{background:#E6B800}
+  #bigAns button[data-n="3"]{background:#2E7D32}
+  #bigAns button[data-n="4"]{background:#1565C0}
+  #bigAns button[data-n="5"]{background:#7B1FA2}
   @media (orientation:landscape){ #bigAns{grid-template-columns:repeat(6,auto);grid-template-rows:auto;padding-left:8px;padding-right:8px} }
   .cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:#eee}
   .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
@@ -61,6 +67,7 @@
     <label><input type="checkbox" name="type" value="rotate" checked>Rotation</label>
   </div>
   <label class="field"><input type="checkbox" class="voiceChk" checked style="width:22px;height:22px">Voice answers</label>
+  <label class="field"><input type="checkbox" id="btnChk" checked style="width:22px;height:22px">Answer buttons</label>
   <label class="field">Music <input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
   <div id="optErr" class="msg"></div>
   <button id="backBtn">Back</button>
@@ -289,8 +296,13 @@ document.querySelectorAll(".voiceChk").forEach(c=>c.addEventListener("change",()
 micCheck();
 
 document.getElementById("optBtn").onclick=()=>{ document.getElementById("optErr").textContent=""; show("options"); };
+const btnChk=document.getElementById("btnChk");
+{ const v=load("buttons"); if(v!==null) btnChk.checked=v; }
+btnChk.addEventListener("change",()=>{ store("buttons",btnChk.checked); document.getElementById("optErr").textContent=""; });
+const NO_INPUT="Turn on Voice or answer buttons.";
 document.getElementById("backBtn").onclick=()=>{
   if(!getOpts().types.length){ document.getElementById("optErr").textContent="Pick at least one difference type."; return; }
+  if(!voiceOn() && !btnChk.checked){ document.getElementById("optErr").textContent=NO_INPUT; return; }
   show("start");
 };
 document.querySelectorAll('input[name="type"]').forEach(i=>i.onchange=()=>{ document.getElementById("optErr").textContent=""; });
@@ -302,6 +314,7 @@ document.getElementById("startBtn").onclick=()=>startGame();
 function startGame(){
   const opts=getOpts();
   const voice=voiceOn();
+  if(!voice && !btnChk.checked){ document.getElementById("err").textContent=NO_INPUT; return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(voice && !SR){ document.getElementById("err").textContent="Speech recognition isn't available in this browser. Use Chrome on Android or Safari on iPhone, or turn off Voice."; return; }
   ensureAudio();
@@ -346,7 +359,7 @@ function startGame(){
     if(!running) return;
     showPair();
     cvs.forEach(c=>c.style.visibility="visible");
-    ansRows.forEach(r=>r.style.visibility="visible");
+    if(btnChk.checked) ansRows.forEach(r=>r.style.visibility="visible");
     ready=true;
     t0=performance.now();
   },ALIGN_MS);
