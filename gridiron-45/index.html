@@ -1,0 +1,1386 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Gridiron 45</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --turf-dark:#0d2b1f;
+    --turf-line:#1d4a35;
+    --chalk:#f2ede1;
+    --amber:#e8a33d;
+    --amber-dim:#8a641f;
+    --vinyl:#14110f;
+    --vinyl-groove:#2a251f;
+    --blood:#a63d33;
+    --panel:#12241c;
+    --shadow: rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(90deg, var(--turf-dark) 0 40px, var(--turf-line) 40px 42px),
+      var(--turf-dark);
+    color:var(--chalk);
+    font-family:'Space Mono', monospace;
+    display:flex;
+    justify-content:center;
+    min-height:100%;
+  }
+  #app{
+    width:100%;
+    max-width:480px;
+    height:100%;
+    background:var(--panel);
+    box-shadow:0 0 60px var(--shadow);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+  .display{
+    font-family:'Teko', sans-serif;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+
+  /* ---------- Header / Scoreboard ---------- */
+  #scoreboard{
+    background:var(--vinyl);
+    border-bottom:3px solid var(--amber-dim);
+    padding:10px 16px 8px;
+    flex-shrink:0;
+    position:relative;
+  }
+  #soundToggle{
+    position:absolute; top:8px; right:10px; z-index:2;
+    background:transparent; border:none; font-size:18px; line-height:1; cursor:pointer;
+    opacity:.85; padding:4px;
+  }
+  #scoreboard .row{display:flex; justify-content:space-between; align-items:center;}
+  .team-score{display:flex; flex-direction:column; align-items:center; min-width:70px;}
+  .team-score .nm{font-size:13px; letter-spacing:.12em; color:var(--amber); opacity:.85;}
+  .team-score .sc{font-family:'Teko',sans-serif; font-weight:700; font-size:38px; line-height:1;}
+  .clockbox{display:flex; flex-direction:column; align-items:center;}
+  .clockbox .q{font-size:11px; color:var(--amber); letter-spacing:.15em;}
+  .clockbox .t{font-family:'Teko',sans-serif; font-size:26px; font-weight:600; line-height:1;}
+  .possess-dot{width:7px; height:7px; border-radius:50%; background:var(--amber); margin-top:3px; box-shadow:0 0 6px var(--amber);}
+  .possess-dot.hidden{visibility:hidden;}
+
+  /* ---------- Field strip ---------- */
+  #fieldstrip{
+    flex-shrink:0;
+    padding:10px 16px 4px;
+    background:var(--vinyl);
+    border-bottom:1px solid var(--vinyl-groove);
+  }
+  #downdist{
+    font-size:12px; letter-spacing:.08em; color:var(--chalk); opacity:.8; margin-bottom:6px; text-align:center;
+  }
+  #field{
+    position:relative;
+    height:34px;
+    background:linear-gradient(180deg, var(--turf-line), var(--turf-dark));
+    border:1px solid var(--amber-dim);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .endzone{position:absolute; top:0; bottom:0; width:6%; background:var(--blood); opacity:.55;}
+  .endzone.left{left:0;} .endzone.right{right:0;}
+  .yardline{position:absolute; top:0; bottom:0; width:1px; background:rgba(242,237,225,.18);}
+  .ballmark{
+    position:absolute; top:50%; width:10px; height:10px; border-radius:50%;
+    background:var(--amber); transform:translate(-50%,-50%);
+    box-shadow:0 0 8px var(--amber);
+    transition: left .5s cubic-bezier(.2,.9,.2,1);
+  }
+  .firstdownmark{
+    position:absolute; top:0; bottom:0; width:2px; background:var(--chalk);
+    opacity:.65; transition: left .5s;
+  }
+
+  /* ---------- Main stage ---------- */
+  #stage{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:18px 16px 28px;
+    position:relative;
+    overflow-y:auto;
+    min-height:0;
+  }
+  .stage-label{
+    text-align:center; font-size:12px; letter-spacing:.2em; color:var(--amber); opacity:.8; margin-bottom:4px;
+  }
+  .stage-title{
+    font-family:'Teko',sans-serif; font-weight:700; font-size:30px; text-align:center; margin:0 0 18px;
+    letter-spacing:.03em;
+  }
+  .stage-sub{ text-align:center; font-size:13px; opacity:.75; margin:-12px 0 18px; line-height:1.5;}
+
+  .btn-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .playbtn{
+    background:var(--vinyl); border:2px solid var(--amber-dim); color:var(--chalk);
+    border-radius:8px; padding:14px 8px; font-family:'Teko',sans-serif; font-size:20px;
+    letter-spacing:.02em; font-weight:600; cursor:pointer; text-transform:uppercase;
+    transition: transform .08s ease, border-color .15s, background .15s;
+  }
+  .playbtn:active{ transform:scale(.96); background:#1d1712; }
+  .playbtn:hover{ border-color:var(--amber); }
+  .playbtn .sub{ display:block; font-family:'Space Mono',monospace; font-size:10px; text-transform:none; opacity:.6; letter-spacing:0; margin-top:2px;}
+  .playbtn.special{ grid-column:1/3; border-color:var(--blood); }
+  .playbtn.gadget{ border-color:var(--blood); border-style:dashed; }
+
+  .bigbtn{
+    display:block; width:100%; background:var(--amber); color:var(--vinyl);
+    border:none; border-radius:8px; padding:16px; font-family:'Teko',sans-serif; font-weight:700;
+    font-size:22px; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; margin-top:14px;
+  }
+  .bigbtn:active{ transform:scale(.98); }
+  .ghostbtn{
+    display:block; width:100%; background:transparent; color:var(--chalk); opacity:.7;
+    border:1px solid var(--vinyl-groove); border-radius:8px; padding:10px; font-family:'Space Mono';
+    font-size:12px; cursor:pointer; margin-top:10px;
+  }
+
+  /* pass-device interstitial */
+  .handoff{
+    text-align:center;
+  }
+  .handoff-icon{ font-size:52px; margin-bottom:6px; }
+
+  /* record reveal */
+  .record-wrap{ display:flex; justify-content:center; margin:10px 0 20px; }
+  .record{
+    width:130px; height:130px; border-radius:50%;
+    background:
+      radial-gradient(circle at center, var(--vinyl) 0 14px, transparent 14.5px),
+      repeating-radial-gradient(circle at center, var(--vinyl-groove) 0 2px, var(--vinyl) 2px 5px);
+    border:2px solid var(--amber-dim);
+    position:relative;
+    animation: spin 2.2s linear infinite;
+  }
+  .record::after{
+    content:''; position:absolute; top:50%; left:50%; width:14px; height:14px; border-radius:50%;
+    background:var(--amber); transform:translate(-50%,-50%);
+  }
+  @keyframes spin{ from{transform:rotate(0)} to{transform:rotate(360deg)} }
+  .announcer{
+    text-align:center; font-family:'Teko',sans-serif; font-size:24px; font-weight:600; min-height:64px;
+    display:flex; align-items:center; justify-content:center; padding:0 6px; line-height:1.15;
+  }
+  .matchup-tag{ text-align:center; font-size:11px; letter-spacing:.1em; opacity:.6; margin-bottom:2px;}
+
+  .result-yards{
+    text-align:center; font-family:'Teko',sans-serif; font-weight:700; font-size:52px; margin:6px 0 0;
+  }
+  .result-yards.gain{ color:var(--amber); }
+  .result-yards.loss{ color:var(--blood); }
+  .result-flavor{ text-align:center; font-size:12px; opacity:.75; margin-top:2px; min-height:32px;}
+
+  /* log */
+  #log{
+    flex-shrink:0;
+    max-height:74px;
+    overflow-y:auto;
+    background:var(--vinyl);
+    border-top:1px solid var(--vinyl-groove);
+    padding:6px 16px;
+    font-size:11px;
+    line-height:1.6;
+    opacity:.75;
+  }
+  #log div:last-child{ color:var(--amber); opacity:1; }
+
+  .hidden{ display:none !important; }
+
+  input[type=text], select{
+    width:100%; background:var(--vinyl); border:1px solid var(--amber-dim); color:var(--chalk);
+    padding:10px; border-radius:6px; font-family:'Space Mono'; font-size:14px; margin-bottom:10px;
+  }
+  .coinflip{ text-align:center; font-size:60px; margin:14px 0; }
+
+  #setup{ padding:26px 22px; height:100%; min-height:0; overflow-y:auto; box-sizing:border-box; }
+  #setup h1{ font-family:'Teko',sans-serif; font-size:40px; text-align:center; margin:0 0 2px; letter-spacing:.03em; color:var(--amber);}
+  #setup .tag{ text-align:center; font-size:11px; letter-spacing:.25em; opacity:.6; margin-bottom:24px;}
+  label{ font-size:11px; letter-spacing:.1em; opacity:.7; display:block; margin-bottom:4px;}
+</style>
+<div id="app">
+
+  <!-- SETUP SCREEN -->
+  <div id="setup">
+    <h1>GRIDIRON 45</h1>
+    <div class="tag">PASS-AND-PLAY FOOTBALL &middot; TWO PLAYERS, ONE DEVICE</div>
+    <label>Team 1 name</label>
+    <input type="text" id="team1name" maxlength="12" placeholder="HOME">
+    <label>Team 2 name</label>
+    <input type="text" id="team2name" maxlength="12" placeholder="AWAY">
+    <label>Quarter length</label>
+    <div class="btn-grid" id="qlenGrid" style="margin-bottom:6px;">
+      <button class="playbtn" data-len="180">3 MIN<span class="sub">quick game</span></button>
+      <button class="playbtn" data-len="300">5 MIN<span class="sub">standard</span></button>
+    </div>
+    <label>Announcer voice <span style="opacity:.5;">(★ = usually better quality)</span></label>
+    <div style="display:flex; gap:8px; align-items:flex-start;">
+      <select id="voiceSelect" style="flex:1;"></select>
+      <button class="ghostbtn" id="refreshVoicesBtn" type="button" style="width:auto; white-space:nowrap; margin-bottom:10px;">&#128260; Refresh</button>
+    </div>
+    <button class="ghostbtn" id="testVoiceBtn" type="button">&#128266; Preview voice</button>
+    <div id="voiceStatus" style="font-size:13px; min-height:40px; margin:6px 0 6px; padding:8px 10px; line-height:1.5; border:1px solid var(--amber); border-radius:6px; background:rgba(232,163,61,.12); color:var(--chalk);">Tap Preview voice or Refresh. Results show here.</div>
+    <div id="voiceLive" style="font-size:11px; opacity:.85; margin:0 0 10px; line-height:1.6; font-family:'Space Mono',monospace; white-space:pre-wrap;"></div>
+    <button class="bigbtn" id="startBtn">START GAME</button>
+    <p style="font-size:11px; opacity:.55; text-align:center; margin-top:16px; line-height:1.6;">
+      One player calls offense in secret, hands the phone over, the other calls a defense blind,
+      then the "record" spins and the play is announced &mdash; just like the old talking-record game.
+    </p>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game" class="hidden" style="display:flex; flex-direction:column; height:100%; min-height:0;">
+    <div id="scoreboard">
+      <button id="soundToggle" aria-label="Toggle announcer sound">&#128266;</button>
+      <div class="row">
+        <div class="team-score">
+          <div class="nm" id="sb-t1-name">HOME</div>
+          <div class="sc" id="sb-t1-score">0</div>
+          <div class="possess-dot hidden" id="sb-t1-dot"></div>
+        </div>
+        <div class="clockbox">
+          <div class="q" id="sb-quarter">Q1</div>
+          <div class="t" id="sb-clock">5:00</div>
+        </div>
+        <div class="team-score">
+          <div class="nm" id="sb-t2-name">AWAY</div>
+          <div class="sc" id="sb-t2-score">0</div>
+          <div class="possess-dot hidden" id="sb-t2-dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fieldstrip">
+      <div id="downdist">1ST &amp; 10 AT OWN 25</div>
+      <div id="field">
+        <div class="endzone left"></div>
+        <div class="endzone right"></div>
+        <div class="firstdownmark" id="firstdownmark"></div>
+        <div class="ballmark" id="ballmark"></div>
+      </div>
+    </div>
+
+    <div id="stage"></div>
+
+    <div id="log"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- CONFIG: plays & defenses (from the real chart) ---------------- */
+  const PLAYS = {
+    qbSneak:   { name:"QB Sneak",       sub:"quick hitter" },
+    offTackle: { name:"Off Tackle Run", sub:"straight ahead" },
+    endSweep:  { name:"End Sweep",      sub:"outside speed" },
+    endAround: { name:"End Around",     sub:"reverse the field" },
+    draw:      { name:"Draw Play",      sub:"delayed handoff" },
+    qbOption:  { name:"QB Option",      sub:"keep or pitch" },
+    shortP:    { name:"Short Pass",     sub:"quick out" },
+    longP:     { name:"Long Pass",      sub:"go deep" },
+    screen:    { name:"Screen Pass",    sub:"let 'em come" },
+    gadget:    { name:"Gadget Play",    sub:"high risk, high reward", special:true },
+  };
+  const DEFENSES = {
+    inRun:   { name:"Inside Run",  sub:"plug the middle" },
+    outRun:  { name:"Outside Run", sub:"contain the edge" },
+    shortD:  { name:"Short Pass",  sub:"jump the quick stuff" },
+    longD:   { name:"Long Pass",   sub:"take away the deep ball" },
+    blitz:   { name:"Blitz",       sub:"send everyone" },
+    prevent: { name:"Prevent",     sub:"protect the deep" },
+  };
+  const PLAY_ORDER = ["qbSneak","offTackle","endSweep","endAround","draw","qbOption","shortP","longP","screen","gadget"];
+  const DEF_ORDER  = ["inRun","outRun","shortD","longD","blitz","prevent"];
+
+  // The exact chart: one known result per matchup, transcribed from the original game.
+  // Every combo gets its own real call — the point of the whole thing.
+  const PLAY_RESULTS = {
+    qbSneak: {
+      inRun:   { yards:1,  flavor:"Quarterback sneaks behind the center — squeezes out a single yard." },
+      outRun:  { yards:4,  flavor:"Sneak up the gut, defense was leaning outside — picks up four." },
+      shortD:  { yards:7,  flavor:"They're sitting on the pass! Quarterback just walks it in for seven." },
+      longD:   { yards:10, flavor:"Nobody home up front — the sneak breaks into the second level, TEN YARDS!" },
+      blitz:   { yards:0, penalty:true, flavor:"Snap gets off clean — wait, FLAG on the play!" },
+      prevent: { yards:9,  flavor:"Prevent defense playing miles off the ball — quarterback just strolls up for nine!" },
+    },
+    offTackle: {
+      inRun:   { yards:-2, flavor:"STONE WALL! Stuffed for a two yard loss!" },
+      outRun:  { yards:3,  flavor:"Finds a crease off tackle, picks up three." },
+      shortD:  { yards:7,  flavor:"Box is light — off tackle busts through for seven!" },
+      longD:   { yards:4,  flavor:"Squeezes through the line for a four yard gain." },
+      blitz:   { yards:11, flavor:"Blitzers overrun it — cutback lane opens up, ELEVEN YARDS!" },
+      prevent: { yards:10, penalty:true, flavor:"Huge hole off tackle, ten yards — but here comes a flag!" },
+    },
+    endSweep: {
+      inRun:   { yards:2,  flavor:"Tries to turn the corner, corner gets there first — just two yards." },
+      outRun:  { yards:-8, turnover:true, turnoverType:"fumble", flavor:"Nailed hard turning the corner — FUMBLE! Ball's loose after an eight yard loss!" },
+      shortD:  { yards:6,  flavor:"Turns the corner for six yards." },
+      longD:   { yards:7,  flavor:"Outruns the pursuit to the edge — seven yards." },
+      blitz:   { yards:10, flavor:"Edge blitzers overpursue — sweep gets outside for TEN!" },
+      prevent: { yards:9,  flavor:"Nobody sets the edge — nine yards on the sweep." },
+    },
+    endAround: {
+      inRun:   { yards:20, turnover:true, turnoverType:"fumble", flavor:"Reverses the field, nobody touches him — TWENTY YARDS! But the exchange comes loose — FUMBLE!" },
+      outRun:  { yards:-2, flavor:"Contain holds up — end around stopped for a two yard loss." },
+      shortD:  { yards:6,  flavor:"Picks up six on the reverse." },
+      longD:   { yards:20, flavor:"Wide open field on the reverse — TWENTY YARDS!" },
+      blitz:   { yards:-7, flavor:"End around... the blitz is on... SEVEN YARD LOSS!" },
+      prevent: { yards:9,  flavor:"End around picks up nine with the defense playing deep." },
+    },
+    draw: {
+      inRun:   { yards:-5, flavor:"They see the draw coming a mile away — stuffed for a five yard loss." },
+      outRun:  { yards:3,  flavor:"Sells the pass, tucks it in — picks up three." },
+      shortD:  { yards:0,  flavor:"Draw play right into the teeth of it — no gain." },
+      longD:   { yards:12, flavor:"Defense drops into coverage — draw gashes them for TWELVE!" },
+      blitz:   { yards:15, flavor:"Blitzers fly upfield — draw play right through the middle, FIFTEEN YARDS!" },
+      prevent: { yards:5,  flavor:"Modest gain of five on the draw." },
+    },
+    qbOption: {
+      inRun:   { td:true, flavor:"Nobody left to account for the quarterback — HE'S GONE! TOUCHDOWN!" },
+      outRun:  { yards:0,  flavor:"Option gets read perfectly by the defense — no gain." },
+      shortD:  { yards:0, incomplete:true, flavor:"Pulls up to throw it, nobody's open — pitches it away, incomplete." },
+      longD:   { yards:20, flavor:"Keeps it himself, turns the corner — TWENTY YARDS!" },
+      blitz:   { yards:15, flavor:"Back to pass... no, he's going to run it himself... FIFTEEN YARDS!" },
+      prevent: { yards:-5, flavor:"Gets strung out and caught in the backfield — five yard loss." },
+    },
+    shortP: {
+      inRun:   { yards:12, penalty:true, flavor:"Quick out pattern, picks up twelve — but there's a flag on the play!" },
+      outRun:  { yards:15, flavor:"Slips out of the backfield — FIFTEEN YARDS on the check-down!" },
+      shortD:  { yards:10, turnover:true, turnoverType:"interception", flavor:"They were sitting right on it — INTERCEPTED!" },
+      longD:   { yards:0, incomplete:true, flavor:"Throws it short, safety breaks it up in time — incomplete." },
+      blitz:   { yards:-3, flavor:"Pressure right in his face — dumps it off for a three yard loss." },
+      prevent: { yards:10, flavor:"Underneath and away for TEN easy yards." },
+    },
+    longP: {
+      inRun:   { yards:30, flavor:"Nobody within twenty yards of him — THIRTY YARDS downfield!" },
+      outRun:  { td:true, flavor:"Streaks right past everybody — TOUCHDOWN!" },
+      shortD:  { yards:16, flavor:"Fights for position, hauls it in — SIXTEEN YARDS!" },
+      longD:   { yards:30, turnover:true, turnoverType:"interception", flavor:"Uncorks a deep one... but it's picked off down the field — INTERCEPTED!" },
+      blitz:   { yards:-10, turnover:true, turnoverType:"fumble", flavor:"Quarterback sacked... TEN YARDS back... FUMBLE!" },
+      prevent: { yards:10, flavor:"Prevent keeps it in front — settles for ten." },
+    },
+    screen: {
+      inRun:   { yards:8,  flavor:"Screen develops — eight yards before they close it down." },
+      outRun:  { yards:0,  flavor:"Screen sniffed out immediately — no gain." },
+      shortD:  { yards:0, incomplete:true, flavor:"They read the screen the whole way — incomplete." },
+      longD:   { yards:25, flavor:"Nobody anywhere near the football — TWENTY-FIVE YARDS on the screen!" },
+      blitz:   { yards:25, flavor:"The blitz is on... pass to the fullback... screen over the middle... TWENTY-FIVE YARDS!" },
+      prevent: { yards:7,  flavor:"Soft underneath coverage — seven yards on the screen." },
+    },
+    gadget: {
+      inRun:   { td:true, flavor:"It's a double reverse... TOUCHDOWN!" },
+      outRun:  { yards:0, turnover:true, turnoverType:"fumble", flavor:"Reverse pitch... but it's fumbled before it ever gets started — TURNOVER!" },
+      shortD:  { yards:23, flavor:"Halfback option... he pulls up and fires it downfield — TWENTY-THREE YARDS!" },
+      longD:   { td:true, flavor:"Flea-flicker... TOUCHDOWN!" },
+      blitz:   { yards:-7, turnover:true, turnoverType:"fumble", flavor:"Throwback pass... but the blitz blows it up before it starts — TURNOVER, seven yard loss!" },
+      prevent: { yards:0, incomplete:true, flavor:"Triple reverse... but there's nobody downfield to catch it — incomplete." },
+    },
+  };
+  // Stable id per matchup for audio clip filenames — e.g. audio/play_screen_blitz.m4a
+  for (const p of PLAY_ORDER) for (const d of DEF_ORDER) PLAY_RESULTS[p][d].id = `play_${p}_${d}`;
+
+  // Rough energy level for the announcer's voice, based on how big the moment is.
+  function resultIntensity(desc){
+    if (desc.td) return "mega";
+    if (desc.turnover) return "hype";
+    if (desc.incomplete) return "calm";
+    if (desc.yards >= 20) return "hype";
+    if (desc.yards <= -5) return "calm";
+    return "normal";
+  }
+
+  // Shared weighted-pick helper used by every "disc."
+  function pickWeighted(list){
+    const total = list.reduce((s,r)=>s+r.weight,0);
+    let roll = Math.random()*total;
+    for (const r of list){
+      if (roll < r.weight) return r;
+      roll -= r.weight;
+    }
+    return list[0];
+  }
+
+  const ANNOUNCER_LINES = [
+    "Snap's away, and it's",
+    "Here comes the play call:",
+    "They're going with",
+    "Offense dials up",
+    "It's",
+    "Watch this call:",
+  ];
+
+  // === PENALTY / FUMBLE RECORD ===
+  // One shared disc for both — a fumble call can land on a flag instead, and a
+  // fumble can be recovered by either side, not just the defense.
+  // === FUMBLE side of the Penalty/Fumble disc — six outcomes, only reachable from a fumble call ===
+  const FUMBLE_RESULTS = [
+    { id:"fum_defense_recovers", name:"Fumble — Defense Recovers",  weight:1, kind:"fumble-def",     flavor:"Ball's loose... DEFENSE pounces on it!" },
+    { id:"fum_offense_recovers", name:"Fumble — Offense Recovers",  weight:1, kind:"fumble-off",     flavor:"The defense has it! Fumbles again! The offense gets it back at the line of scrimmage!" },
+    { id:"fum_defense_return",   name:"Fumble — Defense Returns It", weight:1, kind:"fumble-return", flavor:"Rumbled high in the air, up for grabs — DEFENSE snags it and takes off!", returnYards:20 },
+    { id:"fum_short_return",     name:"Fumble — Short Return",      weight:1, kind:"fumble-return",  flavor:"Bounces right to a defender — short return before he's tackled.", returnYards:8 },
+    { id:"fum_return_td",        name:"Fumble Returned for a Touchdown!", weight:1, kind:"fumble-td",  flavor:"Scoops it up... nobody's going to catch him... TOUCHDOWN!" },
+    { id:"fum_ruled_no_fumble",  name:"Ruled Down — No Fumble",     weight:1, kind:"ruled-down", flavor:"Whistle blows quick — ruled down by contact before it ever came loose. No fumble." },
+  ];
+
+  // === PENALTY side of the Penalty/Fumble disc — six outcomes, only reachable from a flagged call ===
+  const PENALTY_RESULTS = [
+    { id:"pen_holding",              name:"Holding — Offense",     weight:1, kind:"penalty", flavor:"Flag comes in, holding on the offense.",  yards:-10, forceFirstDown:false },
+    { id:"pen_false_start",          name:"False Start",           weight:1, kind:"penalty", flavor:"Flag before the snap even settles.",      yards:-5,  forceFirstDown:false },
+    { id:"pen_delay_of_game",        name:"Delay of Game",         weight:1, kind:"penalty", flavor:"Clock trouble, flag comes in.",            yards:-5,  forceFirstDown:false },
+    { id:"pen_defensive_offside",    name:"Defensive Offside",     weight:1, kind:"penalty", flavor:"Defense jumps early — free yards.",        yards:5,   forceFirstDown:true },
+    { id:"pen_pass_interference",    name:"Pass Interference",     weight:1, kind:"penalty", flavor:"Flag flies downfield — big gain.",         yards:15,  forceFirstDown:true },
+    { id:"pen_declined",             name:"Declined — Play Stands", weight:1, kind:"declined", flavor:"No flag — the original play stands." },
+  ];
+
+  // === KICK / INTERCEPTION RECORD ===
+  // The one with the famous pick-six.
+  const INTERCEPTION_RESULTS = [
+    { id:"int_leaping_pick_six", name:"Leaping Interception — Returned for a Touchdown!", weight:1,  td:true, flavor:"Leaping interception... he's going to go all the way! TOUCHDOWN!" },
+    { id:"int_long_return",     name:"Interception, Long Return",     weight:1, returnYards:32, flavor:"Picks it off and takes it a long way the other direction!" },
+    { id:"int_solid_return",    name:"Interception, Solid Return",    weight:1, returnYards:16, flavor:"Picks it off, nice return up the sideline." },
+    { id:"int_short_return",    name:"Interception, Short Return",    weight:1, returnYards:6,  flavor:"Picks it off, tackled after a short return." },
+    { id:"int_downed_in_place", name:"Interception, Downed in Place", weight:1, returnYards:0,  flavor:"Picks it off, takes a knee right where he caught it." },
+    { id:"int_fumbles_it_back", name:"Interception, Fumbles It Right Back!", weight:1, givesBack:true, flavor:"Picks it off... but fumbles it right back! Original offense recovers!" },
+  ];
+  const FG_MAKE_LINES = [
+    { id:"fg_make_1", text:"Here's the snap... the set... the kick... it's in the air... it's GOOD!" },
+    { id:"fg_make_2", text:"Snap, spot, and the kick — it splits the uprights!" },
+  ];
+  const FG_MISS_LINES = [
+    { id:"fg_miss_1", text:"The kick is up... and it's NO GOOD, wide of the mark!" },
+    { id:"fg_miss_2", text:"Snap, kick... off the upright — NO GOOD!" },
+  ];
+
+  // === KICKOFF / PUNT RECORD ===
+  const KICKOFF_RESULTS = [
+    { id:"ko_touchback",       name:"Touchback",           weight:1, flavor:"Kicked deep, taken a knee.",        spot:()=>25 },
+    { id:"ko_short_return",    name:"Short Return",        weight:1, flavor:"Wrapped up quick.",                 spot:()=>14 + Math.floor(Math.random()*9) },
+    { id:"ko_solid_return",    name:"Solid Return",        weight:1, flavor:"Finds a crease.",                   spot:()=>24 + Math.floor(Math.random()*10) },
+    { id:"ko_good_return",     name:"Good Return",         weight:1, flavor:"Breaks a tackle, good jump.",        spot:()=>35 + Math.floor(Math.random()*12) },
+    { id:"ko_explosive_return",name:"Explosive Return",    weight:1, flavor:"Off to the races!",                 spot:()=>50 + Math.floor(Math.random()*18) },
+    { id:"ko_return_td",       name:"KICK RETURN TOUCHDOWN!", weight:1, flavor:"Nobody's going to catch him!",     spot:()=>100 },
+  ];
+  const PUNT_RESULTS = [
+    { id:"punt_fair_catch_39", name:"Fair Catch — 39 Yard Net",  weight:1, net:39, flavor:"High one down the middle... fair catch called... thirty-nine yards." },
+    { id:"punt_fair_catch_49", name:"Fair Catch — 49 Yard Net",  weight:1, net:49, flavor:"Big leg — high kick, fair catch signaled at forty-nine yards." },
+    { id:"punt_return",        name:"Punt Return",               weight:1, net:28, flavor:"Fields it and picks up a few yards before going down." },
+    { id:"punt_long_return",   name:"Long Return",               weight:1, net:18, flavor:"Finds a crease — nice return on the punt!" },
+    { id:"punt_downed_deep",   name:"Downed Deep",               weight:1, net:46, flavor:"Coverage team gets down there in a hurry — pinned deep!" },
+    { id:"punt_blocked",       name:"BLOCKED PUNT!",             weight:1, blocked:true, flavor:"Punt is blocked... defense recovers..." },
+  ];
+
+  /* ---------------- STATE ---------------- */
+  let S = null; // game state
+  function newGame(t1, t2, qlen){
+    return {
+      teams:[t1||"HOME", t2||"AWAY"],
+      score:[0,0],
+      quarter:1,
+      clock:qlen,
+      qlen:qlen,
+      possession:0,      // index of team on offense
+      ballOn:25,         // yards from CURRENT OFFENSE's own goal line (0-100)
+      down:1,
+      distance:10,
+      pendingOffense:null, // selection made by offense this play
+      log:[],
+      gameOver:false,
+    };
+  }
+
+  const $ = id => document.getElementById(id);
+  const stage = $("stage");
+
+  /* ---------------- ANNOUNCER (speech synthesis) ---------------- */
+  let soundOn = true;
+  let announcerVoice = null;
+  let availableVoices = [];
+  // Browser TTS quality is entirely dependent on which voices are installed on this
+  // device — this just scores whatever's available and grabs the best one it can find.
+  function scoreVoice(v){
+    let score = 0;
+    if (/Enhanced|Premium|Neural|Natural/i.test(v.name)) score += 4;
+    if (/Google US English|Google UK English/i.test(v.name)) score += 3;
+    if (/Microsoft.*Online/i.test(v.name)) score += 3;
+    if (/^en-US$|^en_US$/i.test(v.lang)) score += 1;
+    if (/^en-GB$|^en_GB$/i.test(v.lang)) score += 1;
+    if (/male/i.test(v.name)) score += 1;
+    if (/compact/i.test(v.name)) score -= 4;
+    return score;
+  }
+  function pickVoice(){
+    if (!('speechSynthesis' in window)) return;
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length){ populateVoicePicker(); return; }
+    availableVoices = voices.filter(v => /^en/i.test(v.lang));
+    if (!availableVoices.length) availableVoices = voices;
+    let best = availableVoices[0], bestScore = -Infinity;
+    for (const v of availableVoices){
+      const s = scoreVoice(v);
+      if (s > bestScore){ bestScore = s; best = v; }
+    }
+    if (!announcerVoice) announcerVoice = best; // don't clobber a manual pick on refresh
+    populateVoicePicker();
+  }
+  function populateVoicePicker(){
+    const sel = $("voiceSelect");
+    if (!sel) return;
+    if (!availableVoices.length){
+      sel.innerHTML = '<option value="-1">(no voices reported - will use device default)</option>';
+      return;
+    }
+    sel.innerHTML = availableVoices.map((v,i)=>
+      `<option value="${i}">${v.name}${scoreVoice(v)>=3?' ★':''}</option>`
+    ).join("");
+    const idx = availableVoices.indexOf(announcerVoice);
+    sel.value = idx >= 0 ? idx : 0;
+  }
+  if ('speechSynthesis' in window){
+    pickVoice();
+    speechSynthesis.onvoiceschanged = pickVoice;
+    // some browsers are just slow to expose voices — keep checking for a few seconds
+    // instead of giving up after one retry
+    let voicePollCount = 0;
+    const voicePoll = setInterval(()=>{
+      voicePollCount++;
+      if (availableVoices.length || voicePollCount > 12){ clearInterval(voicePoll); return; }
+      pickVoice();
+    }, 500);
+  }
+  const VOICE_INTENSITY = {
+    calm:   { rate:1.0,  pitch:0.75 },
+    normal: { rate:1.1,  pitch:0.82 },
+    hype:   { rate:1.2,  pitch:0.94 },
+    mega:   { rate:1.32, pitch:1.02 },
+  };
+  const EXCLAIM_LINES = [
+    { id:"exclaim_great_play",    text:"Great play!" },
+    { id:"exclaim_what_a_call",   text:"What a call!" },
+    { id:"exclaim_look_at_that",  text:"Look at that!" },
+    { id:"exclaim_unbelievable",  text:"Unbelievable!" },
+    { id:"exclaim_wow",           text:"Wow!" },
+  ];
+
+  // Looks for a real pre-generated clip at audio/{id}.m4a first; if it's missing,
+  // slow to load, or fails for any reason, falls straight back to live speech
+  // synthesis. This means the game works standalone with zero audio files, and
+  // gets progressively better as real clips are dropped into an audio/ folder.
+  const CLIP_EXTENSIONS = [];
+  function playClipOrSpeak(id, text, intensity){
+    if (!soundOn) return;
+    if (!id){ speak(text, intensity); return; }
+    tryClipExtension(id, text, intensity, 0);
+  }
+  function tryClipExtension(id, text, intensity, extIndex){
+    if (extIndex >= CLIP_EXTENSIONS.length){ speak(text, intensity); return; }
+    let played = false;
+    const ext = CLIP_EXTENSIONS[extIndex];
+    const next = () => { if (!played){ played = true; tryClipExtension(id, text, intensity, extIndex+1); } };
+    try {
+      const audio = new Audio(`audio/${id}.${ext}`);
+      audio.addEventListener('canplaythrough', () => {
+        if (played) return;
+        played = true;
+        audio.play().catch(()=> speak(text, intensity));
+      }, { once:true });
+      audio.addEventListener('error', next, { once:true });
+      setTimeout(next, 400);
+    } catch(e){
+      next();
+    }
+  }
+
+  function maybeExclaim(intensity){
+    if (!soundOn) return;
+    if (intensity === "mega" && Math.random() < 0.7){
+      const ex = EXCLAIM_LINES[Math.floor(Math.random()*EXCLAIM_LINES.length)];
+      setTimeout(()=> playClipOrSpeak(ex.id, ex.text, "mega"), 600);
+    } else if (intensity === "hype" && Math.random() < 0.35){
+      const ex = EXCLAIM_LINES[Math.floor(Math.random()*EXCLAIM_LINES.length)];
+      setTimeout(()=> playClipOrSpeak(ex.id, ex.text, "hype"), 500);
+    }
+  }
+
+  // Synthesized crowd noise — a filtered-noise swell mixed under each call, since we
+  // can't ship a real crowd recording (or Dick Enberg's actual voice) in an artifact.
+  let audioCtx = null;
+  function getAudioCtx(){
+    if (!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+  function playCrowdSwell(intensity){
+    if (!soundOn) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const dur = intensity === "mega" ? 3.4 : intensity === "hype" ? 2.4 : intensity === "calm" ? 1.0 : 1.6;
+    const peak = intensity === "mega" ? 0.32 : intensity === "hype" ? 0.2 : intensity === "calm" ? 0.06 : 0.1;
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){ data[i] = Math.random()*2-1; }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 850;
+    filter.Q.value = 0.5;
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + dur*0.22);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + dur + 0.05);
+  }
+  // The single entry point every reveal should call for a "real call" moment:
+  // crowd swell + the clip (or TTS fallback) + an occasional stinger on big plays.
+  function announceClip(id, text, intensity){
+    intensity = intensity || "normal";
+    playCrowdSwell(intensity);
+    playClipOrSpeak(id, text, intensity);
+    maybeExclaim(intensity);
+  }
+  // Strict mobile browsers (notably iOS Safari) only allow speech synthesis to fire
+  // within a short window of a real tap. Every reveal in this game speaks after a
+  // setTimeout delay (the "record spinning" pause), which can fall outside that
+  // window and get silently blocked. Touching speechSynthesis synchronously on every
+  // tap keeps it "freshly gestured" so the delayed call a moment later still works.
+  function primeSpeech(){
+    if (!('speechSynthesis' in window)) return;
+    try {
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    } catch(e){}
+  }
+  document.addEventListener('click', primeSpeech, true);
+
+  const speechStats = { calls:0, started:0, ended:0, errors:0, lastError:"none" };
+  function speak(text, intensity){
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (announcerVoice) u.voice = announcerVoice;
+    const settings = VOICE_INTENSITY[intensity] || VOICE_INTENSITY.normal;
+    u.rate = settings.rate;
+    u.pitch = settings.pitch;
+    u.volume = 1;
+    speechStats.calls++;
+    u.onstart = () => { speechStats.started++; };
+    u.onend = () => { speechStats.ended++; };
+    u.onerror = (e) => { speechStats.errors++; speechStats.lastError = (e && e.error) || "unknown"; };
+    speechSynthesis.speak(u);
+  }
+  function toggleSound(){
+    soundOn = !soundOn;
+    if (!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+    updateSoundBtn();
+  }
+  function updateSoundBtn(){
+    const btn = $("soundToggle");
+    if (btn) btn.textContent = soundOn ? "\u{1F50A}" : "\u{1F507}";
+  }
+
+  function log(msg){
+    S.log.push(msg);
+    const el = $("log");
+    el.innerHTML = S.log.slice(-6).map(m=>`<div>${m}</div>`).join("");
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function fmtClock(sec){
+    sec = Math.max(0, Math.round(sec));
+    const m = Math.floor(sec/60), s = sec%60;
+    return m+":"+String(s).padStart(2,"0");
+  }
+
+  function otherTeam(i){ return i===0?1:0; }
+
+  function renderScoreboard(){
+    $("sb-t1-name").textContent = S.teams[0];
+    $("sb-t2-name").textContent = S.teams[1];
+    $("sb-t1-score").textContent = S.score[0];
+    $("sb-t2-score").textContent = S.score[1];
+    $("sb-quarter").textContent = S.quarter<=4 ? "Q"+S.quarter : "OT";
+    $("sb-clock").textContent = fmtClock(S.clock);
+    $("sb-t1-dot").classList.toggle("hidden", S.possession!==0);
+    $("sb-t2-dot").classList.toggle("hidden", S.possession!==1);
+  }
+
+  function renderField(){
+    // absolute field position from Team0's goal (0) to Team1's goal (100)
+    const absPos = S.possession===0 ? S.ballOn : 100 - S.ballOn;
+    $("ballmark").style.left = absPos+"%";
+    const fdAbs = S.possession===0
+      ? Math.min(100, S.ballOn + S.distance)
+      : 100 - Math.min(100, S.ballOn + S.distance);
+    $("firstdownmark").style.left = fdAbs+"%";
+
+    const yardToGo = 100 - S.ballOn;
+    let spot;
+    if (S.ballOn <= 50) spot = `OWN ${S.ballOn}`;
+    else spot = `OPP ${100-S.ballOn}`;
+    const downName = ["1ST","2ND","3RD","4TH"][S.down-1];
+    $("downdist").textContent = `${downName} & ${S.distance} AT ${spot}`;
+  }
+
+  function render(){ renderScoreboard(); renderField(); }
+
+  /* ---------------- FLOW CONTROL ---------------- */
+  function startGame(){
+    render();
+    kickoff(S.possession, true);
+  }
+
+  function kickoff(receivingTeam, announce){
+    S.possession = receivingTeam;
+    showHandoff( () => kickoffReveal(receivingTeam) , `${S.teams[receivingTeam]}`, "Kickoff coming — get ready to receive");
+  }
+
+  function kickoffReveal(receivingTeam){
+    const kickingTeam = otherTeam(receivingTeam);
+    const result = pickWeighted(KICKOFF_RESULTS);
+    stage.innerHTML = `
+      <div class="matchup-tag">${S.teams[kickingTeam]} kicks off to ${S.teams[receivingTeam]}</div>
+      <div class="record-wrap"><div class="record"></div></div>
+      <div class="announcer" id="kickText">Ball's in the air...</div>
+    `;
+    setTimeout(()=>{
+      $("kickText").textContent = result.name + "!";
+      speak(`${result.name}!`, "normal");
+      setTimeout(()=>{
+        const isTD = result.name.includes("TOUCHDOWN");
+        const spot = result.spot();
+        stage.innerHTML += `
+          <div class="result-yards ${isTD?'gain':''}">${isTD ? "TOUCHDOWN" : "Ball at "+spot}</div>
+          <div class="result-flavor">${result.flavor}</div>
+          <button class="bigbtn" id="nextBtn">NEXT</button>
+        `;
+        const kickIntensity = isTD ? "mega" : (/Explosive|Good Return/.test(result.name) ? "hype" : "normal");
+        announceClip(result.id, result.flavor, kickIntensity);
+        setTimeout(()=> speak(isTD ? `Touchdown, ${S.teams[receivingTeam]}!` : `Ball at the ${spot}.`, kickIntensity), 1000);
+        $("nextBtn").onclick = () => {
+          tickClock(15);
+          if (isTD){
+            score(receivingTeam, 7);
+            log(`${S.teams[receivingTeam]} takes the kickoff back for a TOUCHDOWN!`);
+            if (S.quarter === 5){ endGame(); return; }
+            afterScoreKickoff(kickingTeam);
+            return;
+          }
+          S.ballOn = spot;
+          S.down = 1; S.distance = 10;
+          log(`${result.name} — ${S.teams[receivingTeam]} start at the ${spot}.`);
+          render();
+          showOffenseSelect();
+        };
+      }, 900);
+    }, 900);
+  }
+
+  function showHandoff(nextFn, teamLabel, subLabel){
+    stage.innerHTML = `
+      <div class="handoff">
+        <div class="handoff-icon">&#128241;</div>
+        <div class="stage-label">${subLabel||"Pass the device"}</div>
+        <div class="stage-title">${teamLabel}</div>
+        <div class="stage-sub">Hand the phone to <b>${teamLabel}</b>. Nobody else peeks at the screen.</div>
+        <button class="bigbtn" id="continueBtn">I'M READY</button>
+      </div>`;
+    $("continueBtn").onclick = nextFn;
+  }
+
+  function offenseTeamName(){ return S.teams[S.possession]; }
+  function defenseTeamName(){ return S.teams[otherTeam(S.possession)]; }
+
+  function showOffenseSelect(){
+    stage.innerHTML = `
+      <div class="stage-label">OFFENSE &mdash; ${offenseTeamName()}</div>
+      <div class="stage-title">Call your play</div>
+      <div class="btn-grid" id="offGrid"></div>
+    `;
+    const grid = $("offGrid");
+    PLAY_ORDER.forEach(id=>{
+      const p = PLAYS[id];
+      const b = document.createElement("button");
+      b.className = p.special ? "playbtn gadget" : "playbtn";
+      b.innerHTML = `${p.name}<span class="sub">${p.sub}</span>`;
+      b.onclick = () => { S.pendingOffense = {type:"play", id}; afterOffensePick(); };
+      grid.appendChild(b);
+    });
+    // Field goal option
+    if (100 - S.ballOn <= 30){
+      const fg = document.createElement("button");
+      fg.className = "playbtn special";
+      fg.innerHTML = `Attempt Field Goal<span class="sub">${(100-S.ballOn)+17} yd try</span>`;
+      fg.onclick = () => { S.pendingOffense = {type:"fg"}; afterOffensePick(); };
+      grid.appendChild(fg);
+    }
+    // Punt option (only 4th down, not deep in opp territory)
+    if (S.down===4 && (100-S.ballOn) > 5){
+      const pt = document.createElement("button");
+      pt.className = "playbtn special";
+      pt.innerHTML = `Punt<span class="sub">flip the field</span>`;
+      pt.onclick = () => { S.pendingOffense = {type:"punt"}; afterOffensePick(); };
+      grid.appendChild(pt);
+    }
+  }
+
+  function afterOffensePick(){
+    if (S.pendingOffense.type !== "play"){
+      // no defensive call for FG/punt — resolve straight through
+      showHandoff(()=>resolveSpecial(), `${defenseTeamName()}`, "Pass back — no defense needed, just watch");
+      return;
+    }
+    showHandoff(()=>showDefenseSelect(), defenseTeamName(), "Pass the device");
+  }
+
+  function showDefenseSelect(){
+    stage.innerHTML = `
+      <div class="stage-label">DEFENSE &mdash; ${defenseTeamName()}</div>
+      <div class="stage-title">Call your defense</div>
+      <div class="stage-sub">You don't know what they picked. Trust your gut.</div>
+      <div class="btn-grid" id="defGrid"></div>
+    `;
+    const grid = $("defGrid");
+    DEF_ORDER.forEach(id=>{
+      const d = DEFENSES[id];
+      const b = document.createElement("button");
+      b.className = "playbtn";
+      b.innerHTML = `${d.name}<span class="sub">${d.sub}</span>`;
+      b.onclick = () => { resolveScrimmagePlay(id); };
+      grid.appendChild(b);
+    });
+  }
+
+  /* ---------------- OUTCOME ENGINE ---------------- */
+
+  function describeResult(result){
+    if (result.td){
+      return { yards:null, flavor:result.flavor, id:result.id, turnover:false, turnoverType:null, penalty:false, td:true };
+    }
+    if (result.turnover){
+      return { yards:result.yards, flavor:result.flavor, id:result.id, turnover:true, turnoverType:result.turnoverType, penalty:false, td:false };
+    }
+    if (result.incomplete){
+      return { yards:0, flavor:result.flavor, id:result.id, turnover:false, turnoverType:null, penalty:false, td:false };
+    }
+    if (result.penalty){
+      return { yards:result.yards, flavor:result.flavor, id:result.id, turnover:false, turnoverType:null, penalty:true, td:false };
+    }
+    return { yards:result.yards, flavor:result.flavor, id:result.id, turnover:false, turnoverType:null, penalty:false, td:false };
+  }
+
+  const PASS_PLAY_IDS = new Set(["shortP", "longP", "screen"]);
+
+  function resolveScrimmagePlay(defId){
+    const off = PLAYS[S.pendingOffense.id];
+    const def = DEFENSES[defId];
+    const raw = PLAY_RESULTS[S.pendingOffense.id][defId];
+    const desc = describeResult(raw);
+    const yards = desc.td ? (100 - S.ballOn) : desc.yards;
+    const intensity = resultIntensity(desc);
+    const isPassPlay = PASS_PLAY_IDS.has(S.pendingOffense.id);
+    runReveal(off.name, def.name, yards, desc.flavor, desc.id, desc.turnover, desc.turnoverType, desc.penalty, intensity, isPassPlay);
+  }
+
+  function runReveal(offName, defName, yards, flavor, clipId, turnover, turnoverType, penalty, intensity, isPassPlay){
+    const line = ANNOUNCER_LINES[Math.floor(Math.random()*ANNOUNCER_LINES.length)];
+    stage.innerHTML = `
+      <div class="matchup-tag">${offName} &nbsp;vs&nbsp; ${defName}</div>
+      <div class="record-wrap"><div class="record"></div></div>
+      <div class="announcer" id="announceText">${line} ...</div>
+    `;
+    setTimeout(()=>{
+      $("announceText").textContent = `${line} ${offName}!`;
+      speak(`${line} ${offName}!`, "normal");
+      setTimeout(()=>{
+        stage.innerHTML += `
+          <div class="result-yards ${yards<0?'loss':'gain'}">${yards>0?'+':''}${yards} yd${Math.abs(yards)===1?'':'s'}</div>
+          <div class="result-flavor">${flavor}${penalty?' &#128681;':''}</div>
+          <button class="bigbtn" id="nextBtn">NEXT</button>
+        `;
+        announceClip(clipId, flavor, intensity);
+        $("nextBtn").onclick = () => {
+          if (penalty) penaltyFumbleReveal("penalty", yards, isPassPlay);
+          else if (turnover && turnoverType === "interception") interceptionReveal(S.ballOn + yards);
+          else if (turnover) penaltyFumbleReveal("fumble", yards);
+          else applyPlayResult(yards, false, flavor);
+        };
+      }, 900);
+    }, 900);
+  }
+
+  // === PENALTY / FUMBLE RECORD reveal ===
+  function penaltyFumbleReveal(originKind, baseYards, isPassPlay){
+    let pool = originKind === "fumble" ? FUMBLE_RESULTS : PENALTY_RESULTS;
+    if (originKind === "penalty" && !isPassPlay){
+      pool = pool.filter(r => r.id !== "pen_pass_interference"); // PI can't happen on a play with no pass
+    }
+    const result = pickWeighted(pool);
+    stage.innerHTML = `
+      <div class="matchup-tag">${originKind === "fumble" ? "FUMBLE" : "FLAG ON THE PLAY"}</div>
+      <div class="record-wrap"><div class="record"></div></div>
+      <div class="announcer" id="pfText">${originKind === "fumble" ? "Scramble for the loose ball..." : "Official reaches for the flag..."}</div>
+    `;
+    setTimeout(()=>{
+      $("pfText").textContent = result.name + "!";
+      speak(`${result.name}!`, result.kind && result.kind.startsWith("fumble") ? "hype" : "normal");
+      setTimeout(()=>{
+        const isTD = result.kind === "fumble-td";
+        let displayYards;
+        if (result.kind === "penalty") displayYards = result.yards;
+        else if (result.kind === "declined" || result.kind === "ruled-down") displayYards = baseYards;
+        else displayYards = 0; // fumble possession-change outcomes are shown as a takeaway, not a yard total
+        stage.innerHTML += `
+          <div class="result-yards ${isTD?'gain':(displayYards<0?'loss':'')}">${isTD ? "TOUCHDOWN" : (result.kind && result.kind.startsWith("fumble") && result.kind !== "ruled-down" ? "" : (displayYards>0?'+':'')+displayYards+' yds')}</div>
+          <div class="result-flavor">${result.flavor}</div>
+          <button class="bigbtn" id="nextBtn">NEXT</button>
+        `;
+        playCrowdSwell(isTD ? "mega" : (result.kind && result.kind.startsWith("fumble") ? "hype" : "normal"));
+        playClipOrSpeak(result.id, result.flavor, isTD ? "mega" : "normal");
+        $("nextBtn").onclick = () => {
+          tickClock(15);
+          switch(result.kind){
+            case "penalty": {
+              applyPlayResult(result.yards, false, result.flavor, result.forceFirstDown);
+              break;
+            }
+            case "fumble-off": {
+              applyPlayResult(baseYards, false, result.flavor);
+              break;
+            }
+            case "declined": {
+              applyPlayResult(baseYards, false, result.flavor);
+              break;
+            }
+            case "ruled-down": {
+              applyPlayResult(baseYards, false, result.flavor);
+              break;
+            }
+            case "fumble-def": {
+              recoverFumble(S.ballOn + baseYards, result.flavor, 0);
+              break;
+            }
+            case "fumble-return": {
+              recoverFumble(S.ballOn + baseYards, result.flavor, result.returnYards || 0);
+              break;
+            }
+            case "fumble-td": {
+              const forcingTeam = otherTeam(S.possession);
+              const losingTeam = S.possession;
+              score(forcingTeam, 7);
+              log(`${result.name} — ${S.teams[forcingTeam]} TOUCHDOWN!`);
+              speak(`Touchdown, ${S.teams[forcingTeam]}!`, "mega");
+              if (S.quarter === 5){ endGame(); return; }
+              afterScoreKickoff(losingTeam);
+              break;
+            }
+          }
+        };
+      }, 900);
+    }, 900);
+  }
+
+  // Defense recovers a fumble at (or returns it from) the spot it came loose.
+  // The recovering team already has the device, so no handoff screen needed.
+  function recoverFumble(turnoverSpot, flavor, returnYards){
+    const forcingTeam = otherTeam(S.possession);
+    if (checkQuarterEnd()) return;
+    const baseSpot = 100 - Math.max(0, Math.min(100, turnoverSpot));
+    S.possession = forcingTeam;
+    S.ballOn = Math.max(1, Math.min(99, baseSpot + returnYards));
+    S.down = 1; S.distance = Math.min(10, 100-S.ballOn);
+    log(`${flavor} ${S.teams[forcingTeam]} take over at the ${S.ballOn}.`);
+    render();
+    showOffenseSelect();
+  }
+
+  function applyPlayResult(yards, turnover, flavor, forceFirstDown){
+    const newSpot = S.ballOn + yards;
+
+    // Touchdown
+    if (newSpot >= 100){
+      const scorer = S.possession;
+      score(scorer, 7);
+      log(`TOUCHDOWN ${S.teams[scorer]}! (+${yards} yd, PAT good)`);
+      playCrowdSwell("mega");
+      speak(`Touchdown, ${S.teams[scorer]}! Extra point is good.`, "mega");
+      maybeExclaim("mega");
+      tickClock(30);
+      if (S.quarter === 5){ endGame(); return; }
+      afterScoreKickoff(otherTeam(scorer));
+      return;
+    }
+    // Safety
+    if (newSpot <= 0){
+      const scorer = otherTeam(S.possession);
+      const kicker = S.possession;
+      score(scorer, 2);
+      log(`SAFETY! ${S.teams[scorer]} scores 2.`);
+      playCrowdSwell("hype");
+      speak(`Safety! Two points, ${S.teams[scorer]}.`, "hype");
+      tickClock(20);
+      if (S.quarter === 5){ endGame(); return; }
+      afterScoreKickoff(kicker); // team that gave up safety kicks
+      return;
+    }
+
+    S.ballOn = newSpot;
+    tickClock(35 + Math.floor(Math.random()*15));
+    if (checkQuarterEnd()) return;
+
+    if (forceFirstDown === true || yards >= S.distance){
+      S.down = 1; S.distance = Math.min(10, 100-S.ballOn);
+      log(`First down, ${offenseTeamName()}.`);
+      render();
+      showHandoff(()=>showOffenseSelect(), offenseTeamName(), "Pass the device");
+    } else if (forceFirstDown === false){
+      // offensive penalty: replay the down, distance shifts with the new spot
+      S.distance = Math.max(1, S.distance - yards);
+      log(`Repeat ${["1st","2nd","3rd","4th"][S.down-1]} down after the flag.`);
+      render();
+      showHandoff(()=>showOffenseSelect(), offenseTeamName(), "Pass the device");
+    } else {
+      S.down += 1;
+      S.distance -= yards;
+      if (S.distance < 1) S.distance = 1;
+      if (S.down > 4){
+        log(`Turnover on downs. ${defenseTeamName()} takes over.`);
+        flipPossessionAt(S.ballOn);
+        return;
+      }
+      render();
+      showHandoff(()=>showOffenseSelect(), offenseTeamName(), "Pass the device");
+    }
+  }
+
+  function resolveSpecial(){
+    if (S.pendingOffense.type === "fg"){
+      const distance = (100 - S.ballOn) + 17;
+      const chance = Math.max(0.1, Math.min(0.95, 1 - (distance-20)/55));
+      const good = Math.random() < chance;
+      const line = good
+        ? FG_MAKE_LINES[Math.floor(Math.random()*FG_MAKE_LINES.length)]
+        : FG_MISS_LINES[Math.floor(Math.random()*FG_MISS_LINES.length)];
+      stage.innerHTML = `
+        <div class="stage-label">FIELD GOAL ATTEMPT</div>
+        <div class="stage-title">${distance} yards out</div>
+        <div class="record-wrap"><div class="record"></div></div>
+        <div class="announcer" id="fgText">Here's the snap...</div>
+      `;
+      setTimeout(()=>{
+        $("fgText").textContent = line.text;
+        announceClip(line.id, line.text, good ? "hype" : "calm");
+        stage.innerHTML += `<button class="bigbtn" id="nextBtn">NEXT</button>`;
+        $("nextBtn").onclick = () => {
+          tickClock(15);
+          if (good){
+            const scorer = S.possession;
+            score(scorer, 3);
+            log(`${S.teams[scorer]} field goal is good from ${distance}.`);
+            if (S.quarter === 5){ endGame(); return; }
+            afterScoreKickoff(otherTeam(scorer));
+          } else {
+            log(`${offenseTeamName()} misses the field goal.`);
+            flipPossessionAt(S.ballOn);
+          }
+        };
+      }, 1000);
+      return;
+    }
+    if (S.pendingOffense.type === "punt"){
+      const result = pickWeighted(PUNT_RESULTS);
+      stage.innerHTML = `
+        <div class="stage-label">PUNT</div>
+        <div class="stage-title">Away it goes...</div>
+        <div class="record-wrap"><div class="record"></div></div>
+        <div class="announcer" id="puntText">Punter drops back...</div>
+      `;
+      setTimeout(()=>{
+        $("puntText").textContent = result.name + "!";
+        announceClip(result.id, result.flavor, result.blocked ? "hype" : "normal");
+        stage.innerHTML += `
+          <div class="result-flavor">${result.flavor}</div>
+          <button class="bigbtn" id="nextBtn">NEXT</button>
+        `;
+        $("nextBtn").onclick = () => {
+          tickClock(20);
+          if (result.blocked){
+            log(`BLOCKED PUNT! ${defenseTeamName()} recovers.`);
+            const spot = Math.max(1, S.ballOn - 3);
+            flipPossessionAt(spot);
+            return;
+          }
+          let landing = S.ballOn + result.net;
+          let touchback = false;
+          if (landing >= 100){ landing = 80; touchback = true; }
+          log(`${offenseTeamName()} punts — ${result.name}${touchback?" (touchback)":""}.`);
+          flipPossessionAt(landing);
+        };
+      }, 900);
+    }
+  }
+
+  function flipPossessionAt(spotFromOldOffense){
+    if (checkQuarterEnd()) return;
+    S.possession = otherTeam(S.possession);
+    S.ballOn = 100 - Math.max(0, Math.min(100, spotFromOldOffense));
+    S.down = 1; S.distance = Math.min(10, 100-S.ballOn);
+    render();
+    showHandoff(()=>showOffenseSelect(), offenseTeamName(), "Pass the device");
+  }
+
+  // === KICK / INTERCEPTION RECORD reveal — the one with the famous pick-six. ===
+  function interceptionReveal(turnoverSpot){
+    const forcingTeam = otherTeam(S.possession); // defense, about to become new offense
+    const losingTeam = S.possession;
+    const result = pickWeighted(INTERCEPTION_RESULTS);
+    stage.innerHTML = `
+      <div class="matchup-tag">INTERCEPTED &mdash; ${S.teams[forcingTeam]} ball</div>
+      <div class="record-wrap"><div class="record"></div></div>
+      <div class="announcer" id="toText">Ball's in the air...</div>
+    `;
+    setTimeout(()=>{
+      $("toText").textContent = result.name + "!";
+      speak(`${result.name}!`, "hype");
+      setTimeout(()=>{
+        const isTD = !!result.td;
+        const givesBack = !!result.givesBack;
+        const baseSpot = 100 - Math.max(0, Math.min(100, turnoverSpot));
+        const newBallOn = isTD ? 100 : Math.min(99, baseSpot + (result.returnYards || 0));
+        stage.innerHTML += `
+          <div class="result-yards ${isTD?'gain':''}">${isTD ? "TOUCHDOWN" : (givesBack ? "Offense keeps it" : "Ball at "+newBallOn)}</div>
+          <div class="result-flavor">${result.flavor}</div>
+          <button class="bigbtn" id="nextBtn">NEXT</button>
+        `;
+        const intensity = isTD ? "mega" : (givesBack ? "hype" : (result.returnYards >= 20 ? "hype" : "normal"));
+        announceClip(result.id, result.flavor, intensity);
+        $("nextBtn").onclick = () => {
+          tickClock(10);
+          if (givesBack){
+            // interceptor fumbles it right back — original offense keeps the ball, treat like an incompletion
+            applyPlayResult(0, false, result.flavor);
+            return;
+          }
+          if (isTD){
+            score(forcingTeam, 7);
+            log(`${result.name} &mdash; ${S.teams[forcingTeam]} TOUCHDOWN!`);
+            playCrowdSwell("mega");
+            speak(`Touchdown, ${S.teams[forcingTeam]}!`, "mega");
+            if (S.quarter === 5){ endGame(); return; }
+            afterScoreKickoff(losingTeam);
+            return;
+          }
+          if (checkQuarterEnd()) return;
+          S.possession = forcingTeam;
+          S.ballOn = newBallOn;
+          S.down = 1; S.distance = Math.min(10, 100-S.ballOn);
+          log(`${result.name} &mdash; ${S.teams[forcingTeam]} take over at the ${S.ballOn}.`);
+          render();
+          showOffenseSelect();
+        };
+      }, 900);
+    }, 900);
+  }
+
+  function afterScoreKickoff(receivingTeam){
+    render();
+    kickoff(receivingTeam, true);
+  }
+
+  function score(teamIdx, pts){
+    S.score[teamIdx] += pts;
+    render();
+  }
+
+  function tickClock(sec){
+    S.clock -= sec;
+  }
+
+  function checkQuarterEnd(){
+    if (S.clock > 0) return false;
+    if (S.quarter < 4){
+      S.quarter += 1;
+      S.clock = S.qlen;
+      if (S.quarter === 3){
+        // halftime: receiving team alternates
+        const receiving = otherTeam(S.possession);
+        render();
+        stage.innerHTML = `
+          <div class="stage-label">END OF HALF</div>
+          <div class="stage-title">Halftime</div>
+          <div class="stage-sub">${S.teams[0]} ${S.score[0]} &mdash; ${S.score[1]} ${S.teams[1]}</div>
+          <button class="bigbtn" id="nextBtn">START 2ND HALF</button>
+        `;
+        $("nextBtn").onclick = () => kickoff(receiving, true);
+        return true;
+      } else {
+        render();
+        stage.innerHTML = `
+          <div class="stage-label">END OF QUARTER</div>
+          <div class="stage-title">Q${S.quarter} coming up</div>
+          <button class="bigbtn" id="nextBtn">CONTINUE</button>
+        `;
+        $("nextBtn").onclick = () => showHandoff(()=>showOffenseSelect(), offenseTeamName(), "Pass the device");
+        return true;
+      }
+    } else {
+      // end of regulation
+      if (S.score[0] === S.score[1]){
+        S.quarter = 5; S.clock = Math.round(S.qlen*0.6);
+        render();
+        stage.innerHTML = `
+          <div class="stage-label">TIED BALLGAME</div>
+          <div class="stage-title">Overtime</div>
+          <div class="stage-sub">Sudden death — first score wins.</div>
+          <button class="bigbtn" id="nextBtn">START OT</button>
+        `;
+        $("nextBtn").onclick = () => kickoff(Math.random()<0.5?0:1, true);
+        return true;
+      }
+      endGame();
+      return true;
+    }
+  }
+
+  function endGame(){
+    S.gameOver = true;
+    render();
+    const winner = S.score[0]===S.score[1] ? null : (S.score[0]>S.score[1]?0:1);
+    stage.innerHTML = `
+      <div class="stage-label">FINAL</div>
+      <div class="stage-title">${winner===null?"It's a tie!":S.teams[winner]+" wins!"}</div>
+      <div class="stage-sub" style="font-size:20px;">${S.teams[0]} ${S.score[0]} &mdash; ${S.score[1]} ${S.teams[1]}</div>
+      <button class="bigbtn" id="newGameBtn">NEW GAME</button>
+    `;
+    $("newGameBtn").onclick = () => { $("game").classList.add("hidden"); $("setup").classList.remove("hidden"); };
+  }
+
+  /* ---------------- SETUP HANDLERS ---------------- */
+  $("soundToggle").addEventListener("click", toggleSound);
+
+  $("voiceSelect").addEventListener("change", (e)=>{
+    const v = availableVoices[parseInt(e.target.value,10)];
+    if (v) announcerVoice = v;
+  });
+  let tapCount = 0;
+  function setStatus(msg){
+    const el = $("voiceStatus");
+    el.textContent = msg;
+    // brief flash so a tap is visibly acknowledged even if nothing else happens
+    el.style.background = "rgba(232,163,61,.55)";
+    setTimeout(()=>{ el.style.background = "rgba(232,163,61,.12)"; }, 250);
+  }
+  function renderLive(){
+    const el = $("voiceLive");
+    if (!el) return;
+    const hasApi = 'speechSynthesis' in window;
+    const ua = navigator.userAgent || "";
+    const webview = /; wv\)|FBAN|FBAV|Instagram|Line\/|GSA\/|Snapchat|MicroMessenger|Version\/[\d.]+ Chrome\/[\d.]+ Mobile/.test(ua);
+    const count = hasApi ? speechSynthesis.getVoices().length : 0;
+    el.textContent =
+      `speech API: ${hasApi ? "yes" : "NO"}\n` +
+      `voices reported: ${count}\n` +
+      `selected: ${announcerVoice ? announcerVoice.name : "(none, device default)"}\n` +
+      `taps seen: ${tapCount}\n` +
+      `speak calls: ${speechStats.calls}  started: ${speechStats.started}  ended: ${speechStats.ended}  errors: ${speechStats.errors}\n` +
+      `last error: ${speechStats.lastError}\n` +
+      `looks like in-app browser: ${webview ? "possibly" : "no"}`;
+  }
+  setInterval(renderLive, 500);
+  renderLive();
+
+  $("refreshVoicesBtn").addEventListener("click", ()=>{
+    tapCount++;
+    if (!('speechSynthesis' in window)){
+      setStatus("This browser has no speechSynthesis API at all.");
+      return;
+    }
+    announcerVoice = null;   // allow a fresh pick
+    pickVoice();
+    const count = speechSynthesis.getVoices().length;
+    setStatus(count
+      ? `Refresh tapped. Found ${count} voice(s).`
+      : "Refresh tapped. Still 0 voices reported. Preview will still try the device default voice.");
+  });
+
+  $("testVoiceBtn").addEventListener("click", ()=>{
+    tapCount++;
+    if (!('speechSynthesis' in window)){
+      setStatus("This browser has no speechSynthesis API at all.");
+      return;
+    }
+    if (speechSynthesis.getVoices().length && !availableVoices.length) pickVoice();
+    const voiceCount = speechSynthesis.getVoices().length;
+    setStatus(`Preview tapped. ${voiceCount} voice(s) reported. Asking the browser to speak...`);
+    const u = new SpeechSynthesisUtterance("Here comes the play call: Long Bomb! He's going deep... TOUCHDOWN!");
+    if (announcerVoice) u.voice = announcerVoice;
+    u.rate = VOICE_INTENSITY.hype.rate; u.pitch = VOICE_INTENSITY.hype.pitch; u.volume = 1;
+    speechStats.calls++;
+    u.onstart = () => { speechStats.started++; setStatus(`Speaking via "${u.voice ? u.voice.name : 'device default'}". If silent, check media volume and the silent switch.`); };
+    u.onend = () => { speechStats.ended++; };
+    u.onerror = (e) => { speechStats.errors++; speechStats.lastError = (e && e.error) || "unknown"; setStatus(`Speech error: "${speechStats.lastError}".`); };
+    try { speechSynthesis.cancel(); } catch(e){}
+    speechSynthesis.speak(u);
+    setTimeout(()=>{
+      if (speechStats.started === 0 && speechStats.errors === 0){
+        setStatus("The browser accepted the request but never started speaking and gave no error. It is silently ignoring speech. Opening the link in full Chrome (not inside an app) is the next thing to try.");
+      }
+    }, 2500);
+  });
+
+  let chosenQlen = 300;
+  document.querySelectorAll("#qlenGrid .playbtn").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      document.querySelectorAll("#qlenGrid .playbtn").forEach(x=>x.style.borderColor="var(--amber-dim)");
+      b.style.borderColor = "var(--amber)";
+      chosenQlen = parseInt(b.dataset.len,10);
+    });
+  });
+
+  $("startBtn").addEventListener("click", ()=>{
+    const t1 = $("team1name").value.trim().toUpperCase() || "HOME";
+    const t2 = $("team2name").value.trim().toUpperCase() || "AWAY";
+    S = newGame(t1, t2, chosenQlen);
+    $("setup").classList.add("hidden");
+    $("game").classList.remove("hidden");
+
+    // opening coin toss
+    stage.innerHTML = `
+      <div class="stage-label">COIN TOSS</div>
+      <div class="stage-title">Who receives?</div>
+      <div class="coinflip">&#127920;</div>
+      <button class="bigbtn" id="flipBtn">FLIP</button>
+    `;
+    $("flipBtn").addEventListener("click", ()=>{
+      const receiver = Math.random()<0.5 ? 0 : 1;
+      $("flipBtn").outerHTML = `<div class="stage-sub" style="font-size:18px; margin-top:10px;">${S.teams[receiver]} will receive!</div>
+        <button class="bigbtn" id="goBtn">KICK IT OFF</button>`;
+      $("goBtn").addEventListener("click", ()=> kickoff(receiver, true) );
+    });
+  });
+
+})();
+</script>
+
+</body></html>
