@@ -321,7 +321,7 @@ function tapAnswer(hit,x,y){
 }
 ["L","R"].forEach(id=>{
   const cv=document.getElementById(id);
-  cv.addEventListener("pointerdown",e=>{
+  cv.addEventListener("click",e=>{
     if(!running || !ready || gameMode!=="speed") return;
     const rect=cv.getBoundingClientRect(), k=S/rect.width;
     const x=(e.clientX-rect.left)*k, y=(e.clientY-rect.top)*k;
