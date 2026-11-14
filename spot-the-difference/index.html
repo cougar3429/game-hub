@@ -35,6 +35,10 @@
   .modes button:first-child{border-radius:8px 0 0 8px}
   .modes button:last-child{border-radius:0 8px 8px 0}
   .modes button.sel{background:#EF9F27;color:#111;border-color:#EF9F27;font-weight:700}
+  .hs{display:flex;gap:24px;justify-content:center;text-align:left;font-size:15px;color:#ccc;margin-top:8px}
+  .hs h3{margin:0 0 4px;font-size:16px;color:#eee}
+  .hs ol{margin:0;padding-left:22px}
+  .hs .none{color:#888}
   .hdr{font-size:36px;font-weight:800;margin-bottom:4px}
   :root{--btn:84px;--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
   #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start;padding:calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl))}
@@ -79,7 +83,14 @@
   <button id="startBtn">Start</button>
   <label class="field"><input type="checkbox" class="voiceChk" checked style="width:22px;height:22px">Voice</label>
   <button id="optBtn">Options</button>
+  <button id="bestBtn">Best</button>
   <div id="err" class="msg"></div>
+</div>
+
+<div id="best" class="screen">
+  <div class="hdr">Best</div>
+  <div class="hs"><div><h3>Classic</h3><ol class="hsList" data-mode="classic"></ol></div><div><h3>Speed</h3><ol class="hsList" data-mode="speed"></ol></div></div>
+  <button id="bestBack">Back</button>
 </div>
 
 <div id="options" class="screen">
@@ -115,6 +126,8 @@
   <div id="time" class="big"></div>
   <button id="newBtn">New Game</button>
   <button id="menuBtn">Main Menu</button>
+  <div class="big" style="font-size:20px;margin-top:8px">High scores</div>
+  <div class="hs"><div><h3>Classic</h3><ol class="hsList" data-mode="classic"></ol></div><div><h3>Speed</h3><ol class="hsList" data-mode="speed"></ol></div></div>
   <div id="recap"></div>
 </div>
 
@@ -316,9 +329,40 @@ function tapAnswer(hit,x,y){
     tapAnswer(Math.hypot(x-m.x,y-m.y)<=m.r+pad, x, y);
   });
 });
+function loadScores(){
+  const v=load("scores"), out={classic:{},speed:{}};
+  if(v&&typeof v==="object") ["classic","speed"].forEach(m=>Object.entries(v[m]||{}).forEach(([k,r])=>{
+    const key=k.toLowerCase(), rec={correct:r.correct,time:r.time,name:r.name||k}, old=out[m][key];
+    if(!old || rec.correct>old.correct || (rec.correct===old.correct && rec.time<old.time)) out[m][key]=rec;
+  }));
+  return out;
+}
+let lastPlayer="";
+function saveScore(m, name, c, t){
+  const all=loadScores(), key=name.toLowerCase(), old=all[m][key];
+  const names=load("names")||{}; names[key]=name; store("names",names);
+  if(!old || c>old.correct || (c===old.correct && t<old.time)){ all[m][key]={correct:c,time:t,name}; store("scores",all); }
+}
+function renderScores(){
+  const all=loadScores(), names=load("names")||{};
+  document.querySelectorAll(".hsList").forEach(ol=>{
+    const onlyMe=!!ol.closest("#done");
+    if(onlyMe){ ol.parentElement.style.display=(ol.dataset.mode===gameMode)?"":"none"; if(ol.dataset.mode!==gameMode) return; }
+    let rows=Object.entries(all[ol.dataset.mode]||{});
+    if(onlyMe) rows=rows.filter(([k])=>k===lastPlayer.toLowerCase());
+    rows.sort((a,b)=>b[1].correct-a[1].correct||a[1].time-b[1].time);
+    ol.innerHTML="";
+    if(!rows.length){ ol.innerHTML='<li class="none" style="list-style:none;margin-left:-22px">None yet</li>'; return; }
+    rows.forEach(([k,r])=>{ const li=document.createElement("li"); li.textContent=(names[k]||r.name)+" \u2014 "+r.correct+"/"+PAIRS+", "+r.time.toFixed(1)+"s"; if(onlyMe) li.style.listStyle="none"; ol.appendChild(li); });
+    if(onlyMe) ol.style.paddingLeft="0";
+  });
+}
 function finish(){
   running=false;
   const secs=(performance.now()-t0)/1000;
+  lastPlayer=document.getElementById("nameIn").value.trim()||"Player";
+  saveScore(gameMode, lastPlayer, correct, Math.round(secs*10)/10);
+  renderScores();
   try{ if(rec) rec.abort(); }catch(e){}
   document.getElementById("score").textContent=correct+" of "+PAIRS+" correct";
   document.getElementById("time").textContent=secs.toFixed(1)+" seconds";
@@ -397,6 +441,8 @@ document.getElementById("backBtn").onclick=()=>{
 document.querySelectorAll('input[name="type"]').forEach(i=>i.onchange=()=>{ document.getElementById("optErr").textContent=""; });
 
 document.querySelectorAll("#bigAns button").forEach(b=>b.onclick=()=>{ if(running && ready) answer(+b.dataset.n); });
+document.getElementById("bestBtn").onclick=()=>{ renderScores(); show("best"); };
+document.getElementById("bestBack").onclick=()=>show("start");
 document.getElementById("menuBtn").onclick=()=>{ document.getElementById("err").textContent=""; show("start"); };
 document.getElementById("newBtn").onclick=()=>startGame();
 document.getElementById("startBtn").onclick=()=>startGame();
@@ -413,6 +459,7 @@ function setMode(m){
 document.getElementById("modeClassic").onclick=()=>setMode("classic");
 document.getElementById("modeSpeed").onclick=()=>setMode("speed");
 setMode(mode);
+renderScores();
 function startGame(){
   const opts=getOpts();
   gameMode=mode;
