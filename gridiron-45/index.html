@@ -203,9 +203,9 @@
   }
   .coinflip{ text-align:center; font-size:60px; margin:14px 0; }
 
-  #setup{ padding:26px 22px; height:100%; min-height:0; overflow-y:auto; box-sizing:border-box; }
+  #setup{ padding:18px 22px; height:100%; min-height:0; overflow-y:auto; box-sizing:border-box; }
   #setup h1{ font-family:'Teko',sans-serif; font-size:40px; text-align:center; margin:0 0 2px; letter-spacing:.03em; color:var(--amber);}
-  #setup .tag{ text-align:center; font-size:11px; letter-spacing:.25em; opacity:.6; margin-bottom:24px;}
+  #setup .tag{ text-align:center; font-size:11px; letter-spacing:.25em; opacity:.6; margin-bottom:16px;}
   label{ font-size:11px; letter-spacing:.1em; opacity:.7; display:block; margin-bottom:4px;}
 </style>
 <div id="app">
@@ -223,7 +223,16 @@
       <button class="playbtn" data-len="180">3 MIN<span class="sub">quick game</span></button>
       <button class="playbtn" data-len="300">5 MIN<span class="sub">standard</span></button>
     </div>
+    <button class="bigbtn" id="startBtn">START GAME</button>
+    <details style="margin-top:18px;">
+      <summary style="cursor:pointer; font-size:12px; letter-spacing:.1em; opacity:.8; padding:6px 0;">Announcer voice settings</summary>
     <label>Announcer voice <span style="opacity:.5;">(★ = usually better quality)</span></label>
+    <div style="margin:4px 0 10px;">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0;">
+        <input type="checkbox" id="englishOnly" style="width:22px; height:22px; margin:0; flex:none;">
+        <span>English only</span>
+      </label>
+    </div>
     <div style="display:flex; gap:8px; align-items:flex-start;">
       <select id="voiceSelect" style="flex:1;"></select>
       <button class="ghostbtn" id="refreshVoicesBtn" type="button" style="width:auto; white-space:nowrap; margin-bottom:10px;">&#128260; Refresh</button>
@@ -231,7 +240,7 @@
     <button class="ghostbtn" id="testVoiceBtn" type="button">&#128266; Preview voice</button>
     <div id="voiceStatus" style="font-size:13px; min-height:40px; margin:6px 0 6px; padding:8px 10px; line-height:1.5; border:1px solid var(--amber); border-radius:6px; background:rgba(232,163,61,.12); color:var(--chalk);">Tap Preview voice or Refresh. Results show here.</div>
     <div id="voiceLive" style="font-size:11px; opacity:.85; margin:0 0 10px; line-height:1.6; font-family:'Space Mono',monospace; white-space:pre-wrap;"></div>
-    <button class="bigbtn" id="startBtn">START GAME</button>
+    </details>
     <p style="font-size:11px; opacity:.55; text-align:center; margin-top:16px; line-height:1.6;">
       One player calls offense in secret, hands the phone over, the other calls a defense blind,
       then the "record" spins and the play is announced &mdash; just like the old talking-record game.
@@ -525,14 +534,18 @@
     if (!('speechSynthesis' in window)) return;
     const voices = speechSynthesis.getVoices();
     if (!voices.length){ populateVoicePicker(); return; }
-    availableVoices = voices.filter(v => /^en/i.test(v.lang));
-    if (!availableVoices.length) availableVoices = voices;
-    let best = availableVoices[0], bestScore = -Infinity;
-    for (const v of availableVoices){
+    const englishVoices = voices.filter(v => /^en/i.test(v.lang));
+    const pool = englishVoices.length ? englishVoices : voices;
+    const eo = $("englishOnly");
+    // list shows every voice unless the "English only" box is checked
+    availableVoices = (eo && eo.checked) ? pool : voices;
+    let best = pool[0], bestScore = -Infinity;
+    for (const v of pool){
       const s = scoreVoice(v);
       if (s > bestScore){ bestScore = s; best = v; }
     }
-    if (!announcerVoice) announcerVoice = best; // don't clobber a manual pick on refresh
+    // don't clobber a manual pick on refresh, unless it's no longer in the list
+    if (!announcerVoice || !availableVoices.includes(announcerVoice)) announcerVoice = best;
     populateVoicePicker();
   }
   function populateVoicePicker(){
@@ -1279,6 +1292,7 @@
   /* ---------------- SETUP HANDLERS ---------------- */
   $("soundToggle").addEventListener("click", toggleSound);
 
+  $("englishOnly").addEventListener("change", pickVoice);
   $("voiceSelect").addEventListener("change", (e)=>{
     const v = availableVoices[parseInt(e.target.value,10)];
     if (v) announcerVoice = v;
