@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Spot the Difference</title>
 <style>
   html,body{margin:0;min-height:100%;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif}
@@ -15,7 +15,7 @@
   .eye{display:flex;flex-direction:column;align-items:center;gap:8px}
   .dot{width:8px;height:8px;border-radius:50%;background:#fff}
   :root{--pic:220px}
-  canvas{width:min(44vw,var(--pic));height:min(44vw,var(--pic));border-radius:4px}
+  canvas{width:var(--pic);height:var(--pic);border-radius:4px}
   .sizer{display:flex;flex-direction:column;align-items:stretch;width:min(92vw,360px)}
   .sizer .top{display:flex;align-items:center;gap:8px;font-size:15px;color:#ccc}
   .sizer input{flex:1;margin:0}
@@ -36,9 +36,11 @@
   .modes button:last-child{border-radius:0 8px 8px 0}
   .modes button.sel{background:#EF9F27;color:#111;border-color:#EF9F27;font-weight:700}
   .hdr{font-size:36px;font-weight:800;margin-bottom:4px}
-  #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start}
+  :root{--btn:84px;--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+  #play{margin:0;width:100%;box-sizing:border-box;min-height:100vh;min-height:100dvh;justify-content:flex-start;padding:calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl))}
+  #probe{position:fixed;visibility:hidden;pointer-events:none;padding:var(--st) var(--sr) var(--sb) var(--sl)}
   #bigAns{flex:1;width:100%;display:grid;grid-template-columns:repeat(2,auto);grid-template-rows:repeat(3,auto);padding-left:8px;padding-right:8px;justify-content:space-between;align-content:space-evenly;padding-top:12px;padding-bottom:12px;box-sizing:border-box;visibility:hidden}
-  #bigAns button{width:84px;height:84px;padding:0;font-size:38px;font-weight:600;background:#C62828;border:none;color:#fff;border-radius:14px}
+  #bigAns button{width:var(--btn);height:var(--btn);padding:0;font-size:38px;font-weight:600;background:#C62828;border:none;color:#fff;border-radius:14px}
   #bigAns button[data-n="0"]{background:#D32F2F}
   #bigAns button[data-n="1"]{background:#EF6C00}
   #bigAns button[data-n="2"]{background:#E6B800}
@@ -46,12 +48,15 @@
   #bigAns button[data-n="4"]{background:#1565C0}
   #bigAns button[data-n="5"]{background:#7B1FA2}
   @media (orientation:landscape){
-    canvas{width:min(44vw,var(--pic),calc(100vh - 190px));height:min(44vw,var(--pic),calc(100vh - 190px))}
-    body.speedPlay canvas{width:min(44vw,var(--pic),calc(100vh - 100px));height:min(44vw,var(--pic),calc(100vh - 100px))}
-    #bigAns button{width:64px;height:64px;font-size:30px}
+    :root{--btn:64px}
+    #bigAns button{font-size:30px}
     #play .sizer{padding-bottom:2px}
   }
-  @media (orientation:landscape){ #bigAns{grid-template-columns:repeat(6,auto);grid-template-rows:auto;padding-left:8px;padding-right:8px} }
+  @media (orientation:landscape){
+    #play{position:relative}
+    #bigAns{position:absolute;inset:0;grid-template-columns:auto auto;grid-template-rows:repeat(3,auto);grid-auto-flow:column;justify-content:space-between;align-content:space-between;padding:calc(8px + var(--st)) calc(12px + var(--sr)) calc(8px + var(--sb)) calc(12px + var(--sl));pointer-events:none}
+    #bigAns button{pointer-events:auto}
+  }
   .cd{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:48px;color:#eee}
   .opts{display:flex;flex-direction:column;gap:14px;text-align:left;font-size:18px}
   .opts label{display:flex;align-items:center;gap:10px}
@@ -63,6 +68,7 @@
 </style>
 </head>
 <body>
+<div id="probe"></div>
 
 <div id="start" class="screen on">
   <div class="logo"><div class="l1">SPOT THE</div><div class="l2">DIFF<span class="odd">E</span>RENCE</div></div>
@@ -249,8 +255,25 @@ function parseNum(text){
 let pairs=[], answers=[], cur=0, correct=0, t0=0, running=false, ready=false, rec=null, consumed=-1;
 const ALIGN_MS=2000;
 
-const SIZE_PX=v=>120+(v-1)*25;
 const landMQ=window.matchMedia("(orientation: landscape)");
+const MIN_PX=100;
+function maxPx(){
+  const pc=getComputedStyle(document.getElementById("probe"));
+  const iL=parseFloat(pc.paddingLeft)||0, iR=parseFloat(pc.paddingRight)||0, iT=parseFloat(pc.paddingTop)||0, iB=parseFloat(pc.paddingBottom)||0;
+  const W=window.innerWidth-iL-iR-32, H=window.innerHeight-iT-iB-32;
+  const btn=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--btn"))||64;
+  const sl=document.querySelector("#play .sizer"), sliderH=(sl&&sl.offsetHeight)||40;
+  const dot=document.querySelector("#play .dot"), dotsH=((dot&&dot.offsetHeight)||8)+8;
+  const GAP=10, SIDE=12;
+  const speedP=document.body.classList.contains("speedPlay");
+  let m=Math.floor((W-GAP)/2);
+  if(landMQ.matches){
+    if(!speedP) m=Math.floor((W-GAP-2*(btn+SIDE))/2);
+    m=Math.min(m, Math.floor(H-dotsH-22-sliderH));
+  }
+  return Math.max(MIN_PX, m);
+}
+const SIZE_PX=v=>Math.round(MIN_PX+(v-1)/9*(maxPx()-MIN_PX));
 function curSize(){ const v=load("picSize"); return v!==null?v:5; }
 function applySize(redraw){
   const v=curSize();
@@ -263,7 +286,7 @@ landMQ.addEventListener("change",()=>applySize(true));
 applySize(false);
 function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); window.scrollTo(0,0); }
 function showPair(){ draw("L",pairs[cur].left); draw("R",pairs[cur].right); }
-window.addEventListener("resize",()=>{ if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS) drawRecap(); });
+window.addEventListener("resize",()=>{ applySize(false); if(running && ready && cur<PAIRS) showPair(); else if(!running && cur>=PAIRS) drawRecap(); });
 
 function answer(n){
   beep();
@@ -425,6 +448,7 @@ function startGame(){
   }
   pairs=Array.from({length:PAIRS},()=>makePair(opts, speed?1:undefined));
   document.body.classList.toggle("speedPlay", speed);
+  applySize(false);
   answers=[]; taps=[]; cur=0; correct=0; running=true; ready=false;
   const cvs=[document.getElementById("L"),document.getElementById("R")];
   const ansRows=[document.getElementById("bigAns")];
